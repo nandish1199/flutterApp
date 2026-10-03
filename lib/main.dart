@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'breathing_exercise_page.dart';
 import 'calorie_tracker_page.dart';
 import 'profile_page.dart';
+import 'serum_tracker_page.dart';
 import 'workout_tracker_page.dart';
 
 void main() => runApp(const ElateFitApp());
@@ -26,7 +28,7 @@ class ElateFitApp extends StatelessWidget {
 }
 
 /// Hosts the bottom navigation and switches between the
-/// Home, Workout, Progress (calorie tracker), and Profile tabs.
+/// Home, Workout, Progress, Serum, Breathing, and Profile tabs.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -45,9 +47,13 @@ class _MainShellState extends State<MainShell> {
       HomePage(
         onOpenWorkout: () => _openTab(1),
         onOpenProgress: () => _openTab(2),
+        onOpenSerum: () => _openTab(3),
+        onOpenBreathing: () => _openTab(4),
       ),
       const WorkoutTrackerPage(),
-      CalorieTrackerPage(onOpenProfile: () => _openTab(3)),
+      CalorieTrackerPage(onOpenProfile: () => _openTab(4)),
+      const SerumTrackerPage(),
+      const BreathingExercisePage(),
       const ProfilePage(),
     ];
     return Scaffold(
@@ -75,6 +81,16 @@ class _MainShellState extends State<MainShell> {
             label: 'Progress',
           ),
           NavigationDestination(
+            icon: Icon(Icons.auto_awesome_outlined),
+            selectedIcon: Icon(Icons.auto_awesome),
+            label: 'Serum',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.air_outlined),
+            selectedIcon: Icon(Icons.air),
+            label: 'Breathe',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Profile',
@@ -86,10 +102,18 @@ class _MainShellState extends State<MainShell> {
 }
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key, this.onOpenWorkout, this.onOpenProgress});
+  const HomePage({
+    super.key,
+    this.onOpenWorkout,
+    this.onOpenProgress,
+    this.onOpenSerum,
+    this.onOpenBreathing,
+  });
 
   final VoidCallback? onOpenWorkout;
   final VoidCallback? onOpenProgress;
+  final VoidCallback? onOpenSerum;
+  final VoidCallback? onOpenBreathing;
 
   static const ink = AppColors.ink;
   static const muted = AppColors.muted;
@@ -326,6 +350,10 @@ class HomePage extends StatelessWidget {
                 ? onOpenProgress
                 : item.title == 'Move'
                 ? onOpenWorkout
+                : item.title == 'Care'
+                ? onOpenSerum
+                : item.title == 'Reset'
+                ? onOpenBreathing
                 : null,
             child: Padding(
               padding: const EdgeInsets.all(15),
