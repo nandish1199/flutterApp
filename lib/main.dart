@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'app_colors.dart';
+import 'calorie_tracker_page.dart';
+import 'profile_page.dart';
+
 void main() => runApp(const ElateFitApp());
 
 class ElateFitApp extends StatelessWidget {
@@ -15,53 +19,40 @@ class ElateFitApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8FAF7),
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFBFDCCB)),
       ),
-      home: const HomePage(),
+      home: const MainShell(),
     );
   }
 }
 
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+/// Hosts the bottom navigation and switches between the
+/// Home, Progress (calorie tracker), and Profile tabs.
+class MainShell extends StatefulWidget {
+  const MainShell({super.key});
 
-  static const ink = Color(0xFF18231E);
-  static const muted = Color(0xFF718078);
-  static const lime = Color(0xFFD8F29A);
-  static const mint = Color(0xFFDFF2E6);
-  static const peach = Color(0xFFFFDFCB);
-  static const lavender = Color(0xFFE7E1F6);
+  @override
+  State<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends State<MainShell> {
+  int _index = 0;
+
+  void _openTab(int index) => setState(() => _index = index);
 
   @override
   Widget build(BuildContext context) {
+    final pages = [
+      HomePage(onOpenProgress: () => _openTab(1)),
+      CalorieTrackerPage(onOpenProfile: () => _openTab(2)),
+      const ProfilePage(),
+    ];
     return Scaffold(
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  _header(),
-                  const SizedBox(height: 26),
-                  _snapshot(),
-                  const SizedBox(height: 26),
-                  _heading('Your wellness space', 'See all'),
-                  const SizedBox(height: 14),
-                  _features(),
-                  const SizedBox(height: 26),
-                  _heading('Today\'s rhythm', 'Edit plan'),
-                  const SizedBox(height: 14),
-                  _plan(),
-                ]),
-              ),
-            ),
-          ],
-        ),
-      ),
+      body: pages[_index],
       bottomNavigationBar: NavigationBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        selectedIndex: 0,
-        indicatorColor: lime,
+        selectedIndex: _index,
+        indicatorColor: HomePage.lime,
+        onDestinationSelected: _openTab,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -77,6 +68,47 @@ class HomePage extends StatelessWidget {
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Profile',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class HomePage extends StatelessWidget {
+  const HomePage({super.key, this.onOpenProgress});
+
+  final VoidCallback? onOpenProgress;
+
+  static const ink = AppColors.ink;
+  static const muted = AppColors.muted;
+  static const lime = AppColors.lime;
+  static const mint = AppColors.mint;
+  static const peach = AppColors.peach;
+  static const lavender = AppColors.lavender;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _header(),
+                const SizedBox(height: 26),
+                _snapshot(),
+                const SizedBox(height: 26),
+                _heading('Your wellness space', 'See all'),
+                const SizedBox(height: 14),
+                _features(),
+                const SizedBox(height: 26),
+                _heading('Today\'s rhythm', 'Edit plan'),
+                const SizedBox(height: 14),
+                _plan(),
+              ]),
+            ),
           ),
         ],
       ),
@@ -274,36 +306,40 @@ class HomePage extends StatelessWidget {
       ),
       itemBuilder: (context, index) {
         final item = items[index];
-        return Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            color: item.color,
+        return Material(
+          color: item.color,
+          borderRadius: BorderRadius.circular(20),
+          child: InkWell(
             borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(item.icon, color: ink, size: 25),
-              Column(
+            onTap: item.title == 'Fuel' ? onOpenProgress : null,
+            child: Padding(
+              padding: const EdgeInsets.all(15),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    item.title,
-                    style: const TextStyle(
-                      color: ink,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    item.subtitle,
-                    style: const TextStyle(color: muted, fontSize: 11),
+                  Icon(item.icon, color: ink, size: 25),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        style: const TextStyle(
+                          color: ink,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        item.subtitle,
+                        style: const TextStyle(color: muted, fontSize: 11),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         );
       },
