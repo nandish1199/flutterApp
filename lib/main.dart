@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'calorie_tracker_page.dart';
 import 'profile_page.dart';
+import 'workout_tracker_page.dart';
 
 void main() => runApp(const ElateFitApp());
 
@@ -25,7 +26,7 @@ class ElateFitApp extends StatelessWidget {
 }
 
 /// Hosts the bottom navigation and switches between the
-/// Home, Progress (calorie tracker), and Profile tabs.
+/// Home, Workout, Progress (calorie tracker), and Profile tabs.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -41,8 +42,12 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      HomePage(onOpenProgress: () => _openTab(1)),
-      CalorieTrackerPage(onOpenProfile: () => _openTab(2)),
+      HomePage(
+        onOpenWorkout: () => _openTab(1),
+        onOpenProgress: () => _openTab(2),
+      ),
+      const WorkoutTrackerPage(),
+      CalorieTrackerPage(onOpenProfile: () => _openTab(3)),
       const ProfilePage(),
     ];
     return Scaffold(
@@ -58,6 +63,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
             label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.fitness_center_outlined),
+            selectedIcon: Icon(Icons.fitness_center),
+            label: 'Workout',
           ),
           NavigationDestination(
             icon: Icon(Icons.insights_outlined),
@@ -76,8 +86,9 @@ class _MainShellState extends State<MainShell> {
 }
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key, this.onOpenProgress});
+  const HomePage({super.key, this.onOpenWorkout, this.onOpenProgress});
 
+  final VoidCallback? onOpenWorkout;
   final VoidCallback? onOpenProgress;
 
   static const ink = AppColors.ink;
@@ -311,7 +322,11 @@ class HomePage extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
-            onTap: item.title == 'Fuel' ? onOpenProgress : null,
+            onTap: item.title == 'Fuel'
+                ? onOpenProgress
+                : item.title == 'Move'
+                ? onOpenWorkout
+                : null,
             child: Padding(
               padding: const EdgeInsets.all(15),
               child: Column(
