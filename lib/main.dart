@@ -51,12 +51,14 @@ class _MainShellState extends State<MainShell> {
         onOpenProgress: () => _openTab(2),
         onOpenSerum: () => _openTab(3),
         onOpenBreathing: () => _openTab(4),
+        onOpenWeight: () => _openTab(6),
       ),
       const WorkoutTrackerPage(),
       CalorieTrackerPage(onOpenProfile: () => _openTab(6)),
       const SerumTrackerPage(),
       const BreathingExercisePage(),
       const CardioConfigurePage(),
+      const WeightTrackerPage(),
       const ProfilePage(),
     ];
     return Scaffold(
@@ -79,9 +81,9 @@ class _MainShellState extends State<MainShell> {
             label: 'Workout',
           ),
           NavigationDestination(
-            icon: Icon(Icons.insights_outlined),
-            selectedIcon: Icon(Icons.insights),
-            label: 'Progress',
+            icon: Icon(Icons.ramen_dining),
+            selectedIcon: Icon(Icons.ramen_dining),
+            label: 'Calories',
           ),
           NavigationDestination(
             icon: Icon(Icons.auto_awesome_outlined),
@@ -97,6 +99,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.bolt_outlined),
             selectedIcon: Icon(Icons.bolt),
             label: 'Cardio',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.monitor_weight_outlined),
+            selectedIcon: Icon(Icons.monitor_weight),
+            label: 'Weight',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
@@ -116,12 +123,14 @@ class HomePage extends StatelessWidget {
     this.onOpenProgress,
     this.onOpenSerum,
     this.onOpenBreathing,
+    this.onOpenWeight,
   });
 
   final VoidCallback? onOpenWorkout;
   final VoidCallback? onOpenProgress;
   final VoidCallback? onOpenSerum;
   final VoidCallback? onOpenBreathing;
+  final VoidCallback? onOpenWeight;
 
   static const ink = AppColors.ink;
   static const muted = AppColors.muted;
@@ -315,13 +324,8 @@ class HomePage extends StatelessWidget {
 
   Widget _features() {
     const items = [
-      _Feature('Move', 'Workout tracker', Icons.directions_run_rounded, peach),
-      _Feature(
-        'Fuel',
-        'Calorie tracker',
-        Icons.local_fire_department_rounded,
-        lime,
-      ),
+      _Feature('Lift', 'Workout tracker', Icons.fitness_center, peach),
+      _Feature('Fuel', 'Calorie tracker', Icons.ramen_dining, lime),
       _Feature('Restore', 'Sleep sounds', Icons.nightlight_round, lavender),
       _Feature('Care', 'Medicine intake', Icons.medication_rounded, mint),
       _Feature(
@@ -363,11 +367,7 @@ class HomePage extends StatelessWidget {
                 : item.title == 'Reset'
                 ? onOpenBreathing
                 : item.title == 'Balance'
-                ? () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const WeightTrackerPage(),
-                    ),
-                  )
+                ? onOpenWeight
                 : null,
             child: Padding(
               padding: const EdgeInsets.all(15),

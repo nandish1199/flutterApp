@@ -751,11 +751,7 @@ class _CalorieTrackerPageState extends State<CalorieTrackerPage> {
           color: AppColors.ink,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Icon(
-          Icons.local_fire_department_rounded,
-          color: AppColors.lime,
-          size: 24,
-        ),
+        child: const Icon(Icons.ramen_dining, color: AppColors.lime, size: 24),
       ),
       const SizedBox(width: 12),
       const Expanded(

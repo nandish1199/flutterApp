@@ -242,41 +242,22 @@ class _WeightTrackerPageState extends State<WeightTrackerPage> {
   ];
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.background,
-    appBar: AppBar(
-      backgroundColor: AppColors.background,
-      elevation: 0,
-      foregroundColor: AppColors.ink,
-      title: const Text(
-        'Weight tracker',
-        style: TextStyle(fontWeight: FontWeight.w800),
-      ),
-      actions: [
-        IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.close_rounded),
-          tooltip: 'Close',
-        ),
+  Widget build(BuildContext context) => SafeArea(
+    child: ListView(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+      children: [
+        _intro(),
+        const SizedBox(height: 18),
+        _measurementCard(),
+        const SizedBox(height: 18),
+        _trendCard(),
+        const SizedBox(height: 18),
+        _goalCard(),
+        const SizedBox(height: 18),
+        _historyCard(),
+        const SizedBox(height: 18),
+        _photosCard(),
       ],
-    ),
-    body: SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-        children: [
-          _intro(),
-          const SizedBox(height: 18),
-          _measurementCard(),
-          const SizedBox(height: 18),
-          _trendCard(),
-          const SizedBox(height: 18),
-          _goalCard(),
-          const SizedBox(height: 18),
-          _historyCard(),
-          const SizedBox(height: 18),
-          _photosCard(),
-        ],
-      ),
     ),
   );
 

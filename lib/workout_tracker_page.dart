@@ -397,7 +397,7 @@ class _WorkoutTrackerPageState extends State<WorkoutTrackerPage> {
           borderRadius: BorderRadius.circular(16),
         ),
         child: const Icon(
-          Icons.fitness_center_rounded,
+          Icons.fitness_center,
           color: AppColors.lime,
           size: 23,
         ),
@@ -819,7 +819,7 @@ class _WorkoutTrackerPageState extends State<WorkoutTrackerPage> {
       const SizedBox(height: 12),
       const Row(
         children: [
-          Icon(Icons.fitness_center_rounded, color: AppColors.muted, size: 15),
+          Icon(Icons.fitness_center, color: AppColors.muted, size: 15),
           SizedBox(width: 6),
           Text(
             'Workout completed',
@@ -1010,11 +1010,7 @@ class _WorkoutTrackerPageState extends State<WorkoutTrackerPage> {
           color: AppColors.tiles[index % AppColors.tiles.length],
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(
-          Icons.fitness_center_rounded,
-          color: AppColors.ink,
-          size: 17,
-        ),
+        child: const Icon(Icons.fitness_center, color: AppColors.ink, size: 17),
       ),
       const SizedBox(width: 12),
       Expanded(
