@@ -6,6 +6,7 @@ import 'cardio_configure_page.dart';
 import 'calorie_tracker_page.dart';
 import 'profile_page.dart';
 import 'serum_tracker_page.dart';
+import 'sleep_sounds_page.dart';
 import 'workout_tracker_page.dart';
 import 'weight_tracker_page.dart';
 
@@ -52,6 +53,9 @@ class _MainShellState extends State<MainShell> {
         onOpenSerum: () => _openTab(3),
         onOpenBreathing: () => _openTab(4),
         onOpenWeight: () => _openTab(6),
+        onOpenSleepSounds: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const SleepSoundsPage()),
+        ),
       ),
       const WorkoutTrackerPage(),
       CalorieTrackerPage(onOpenProfile: () => _openTab(6)),
@@ -124,6 +128,7 @@ class HomePage extends StatelessWidget {
     this.onOpenSerum,
     this.onOpenBreathing,
     this.onOpenWeight,
+    this.onOpenSleepSounds,
   });
 
   final VoidCallback? onOpenWorkout;
@@ -131,6 +136,7 @@ class HomePage extends StatelessWidget {
   final VoidCallback? onOpenSerum;
   final VoidCallback? onOpenBreathing;
   final VoidCallback? onOpenWeight;
+  final VoidCallback? onOpenSleepSounds;
 
   static const ink = AppColors.ink;
   static const muted = AppColors.muted;
@@ -360,6 +366,8 @@ class HomePage extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             onTap: item.title == 'Fuel'
                 ? onOpenProgress
+                : item.title == 'Restore'
+                ? onOpenSleepSounds
                 : item.title == 'Move'
                 ? onOpenWorkout
                 : item.title == 'Care'
