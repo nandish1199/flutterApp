@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 import 'breathing_exercise_page.dart';
+import 'cardio_configure_page.dart';
 import 'calorie_tracker_page.dart';
 import 'profile_page.dart';
 import 'serum_tracker_page.dart';
 import 'workout_tracker_page.dart';
+import 'weight_tracker_page.dart';
 
 void main() => runApp(const ElateFitApp());
 
@@ -28,7 +30,7 @@ class ElateFitApp extends StatelessWidget {
 }
 
 /// Hosts the bottom navigation and switches between the
-/// Home, Workout, Progress, Serum, Breathing, and Profile tabs.
+/// Home, Workout, Progress, Serum, Breathing, Cardio, and Profile tabs.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -51,9 +53,10 @@ class _MainShellState extends State<MainShell> {
         onOpenBreathing: () => _openTab(4),
       ),
       const WorkoutTrackerPage(),
-      CalorieTrackerPage(onOpenProfile: () => _openTab(4)),
+      CalorieTrackerPage(onOpenProfile: () => _openTab(6)),
       const SerumTrackerPage(),
       const BreathingExercisePage(),
+      const CardioConfigurePage(),
       const ProfilePage(),
     ];
     return Scaffold(
@@ -89,6 +92,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.air_outlined),
             selectedIcon: Icon(Icons.air),
             label: 'Breathe',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bolt_outlined),
+            selectedIcon: Icon(Icons.bolt),
+            label: 'Cardio',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
@@ -354,6 +362,12 @@ class HomePage extends StatelessWidget {
                 ? onOpenSerum
                 : item.title == 'Reset'
                 ? onOpenBreathing
+                : item.title == 'Balance'
+                ? () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const WeightTrackerPage(),
+                    ),
+                  )
                 : null,
             child: Padding(
               padding: const EdgeInsets.all(15),
