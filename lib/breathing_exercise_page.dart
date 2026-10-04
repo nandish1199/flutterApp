@@ -122,10 +122,10 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
   final TextEditingController _gapController = TextEditingController(text: '1');
   final List<BreathingPlanItem> _plan = [BreathingPlanItem(techniqueIndex: 0)];
 
-  Timer? _timer;
   AnimationController? _orbController;
   BreathingVoice _voice = BreathingVoice.count;
 
+  int _sessionId = 0;
   int _techniqueIndex = 0;
   int _phaseIndex = 0;
   int _repetition = 1;
@@ -135,6 +135,7 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
   bool _inGap = false;
   bool _running = false;
   bool _complete = false;
+  bool _isInitialCountdown = false;
   String _status = 'Audio guidance is available when you start.';
 
   // Calendar State
@@ -169,9 +170,11 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _sessionId++;
     _orbController?.dispose();
-    _tts.stop();
+    try {
+      _tts.stop();
+    } catch (_) {}
     _gapController.dispose();
     super.dispose();
   }
@@ -187,22 +190,26 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
   String _dayKey(DateTime date) =>
       '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
-  Future<void> _speak(String text, {bool count = false}) async {
-    if (_voice == BreathingVoice.chimes ||
-        (count && _voice != BreathingVoice.count)) {
-      return;
-    }
+  bool _isValid(int currentSession) =>
+      mounted && _running && _sessionId == currentSession;
+
+  /// Speaks longer words/phrases and waits for them to finish with a safe timeout
+  Future<void> _speakPhrase(String text) async {
+    if (_voice == BreathingVoice.chimes) return;
     try {
       await _tts.awaitSpeakCompletion(true);
-      await _tts.speak(text);
-    } catch (_) {
-      // The visual guide and chimes remain available when speech is unavailable.
-    }
+      await _tts
+          .speak(text)
+          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+    } catch (_) {}
   }
 
-  Future<void> _announce(String text) async {
-    await _speak(text);
-    if (mounted) _playChime();
+  /// Instantly fires a countdown digit without waiting, ensuring exact 1-second cadence
+  void _speakDigit(int number) {
+    if (_voice != BreathingVoice.count) return;
+    try {
+      _tts.speak('$number');
+    } catch (_) {}
   }
 
   void _playChime() => SystemSound.play(SystemSoundType.click);
@@ -218,14 +225,17 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
   }
 
   void _reset() {
-    _timer?.cancel();
+    _sessionId++;
     _orbController?.dispose();
     _orbController = null;
-    _tts.stop();
+    try {
+      _tts.stop();
+    } catch (_) {}
     setState(() {
       _running = false;
       _complete = false;
       _inGap = false;
+      _isInitialCountdown = false;
       _techniqueIndex = 0;
       _phaseIndex = 0;
       _repetition = 1;
@@ -238,97 +248,127 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
   Future<void> _start() async {
     if (_hasSession) return;
     FocusManager.instance.primaryFocus?.unfocus();
-    final firstPhase = _plan.first.technique.phases.first;
+
+    final currentSession = ++_sessionId;
+
     setState(() {
       _running = true;
       _complete = false;
+      _isInitialCountdown = true;
       _techniqueIndex = 0;
       _phaseIndex = 0;
       _repetition = 1;
-      _remaining = firstPhase.seconds;
+      _remaining = 5;
       _elapsed = 0;
       _totalSeconds = _totalPlanSeconds;
       _status = 'Get comfortable and follow the guide.';
     });
 
-    // 1. Say "Start" and wait exactly 300ms
-    await _speak('Start');
-    if (!mounted || !_running) return;
-
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted || !_running) return;
-
-    // 2. Count down initial start sequence
-    await _speak('5, 4, 3, 2, 1');
-    if (!mounted || !_running) return;
-
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted || !_running) return;
-
-    // 3. Announce technique name completely
-    await _announce(_plan.first.technique.name);
-    if (!mounted || !_running) return;
-
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted || !_running) return;
-
-    // 4. Start first phase ("Inhale") and start exact 1-second timer
-    _startPhase(0);
-    if (mounted && _running) {
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+    // 1. Say "Start"
+    if (_voice != BreathingVoice.chimes) {
+      await _speakPhrase('Start');
     }
-  }
+    if (!_isValid(currentSession)) return;
 
-  void _tick() {
-    if (!_running || !mounted) return;
-    setState(() {
-      _remaining--;
-      _elapsed++;
-    });
+    // 2. Exact 200ms gap after "Start" finishes
+    await Future.delayed(const Duration(milliseconds: 200));
+    if (!_isValid(currentSession)) return;
 
-    if (_remaining > 0) {
-      // Guarantee exact 1-second ticks by calling speak directly.
-      // (Removed the blocking flag so it never misses a countdown number).
-      if (_voice == BreathingVoice.count &&
-          _isCountedPhase(_currentPhase.name)) {
-        _speak('$_remaining', count: true);
-      }
-      return;
+    // 3. Initial countdown 5 -> 1 with exactly 1 second per count
+    for (int i = 5; i >= 1; i--) {
+      setState(() => _remaining = i);
+      _speakDigit(i);
+      await Future.delayed(const Duration(seconds: 1));
+      if (!_isValid(currentSession)) return;
     }
 
-    if (_inGap) {
-      _finishGap();
-      return;
-    }
+    setState(() => _isInitialCountdown = false);
 
-    final item = _currentItem;
-    if (_phaseIndex + 1 < item.technique.phases.length) {
-      _startPhase(_phaseIndex + 1);
-    } else if (_repetition < item.repetitions) {
+    // 4. Run session plan
+    for (int tIdx = 0; tIdx < _plan.length; tIdx++) {
       setState(() {
-        _repetition++;
-        _phaseIndex = 0;
-        _remaining = item.technique.phases.first.seconds;
+        _techniqueIndex = tIdx;
+        _status = 'Follow the breathing pattern.';
       });
-      _announcePhase(item.technique.phases.first);
-    } else if (_techniqueIndex + 1 < _plan.length) {
-      _techniqueIndex++;
-      _phaseIndex = 0;
-      _repetition = 1;
-      if (_gapSeconds > 0) {
+
+      final item = _plan[tIdx];
+
+      // Announce technique name completely
+      _playChime();
+      if (_voice != BreathingVoice.chimes) {
+        await _speakPhrase(item.technique.name);
+        await Future.delayed(const Duration(milliseconds: 300));
+      } else {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      if (!_isValid(currentSession)) return;
+
+      // Loop through repetitions
+      for (int rep = 1; rep <= item.repetitions; rep++) {
+        setState(() => _repetition = rep);
+
+        // Loop through phases (e.g. Inhale, Exhale)
+        for (int pIdx = 0; pIdx < item.technique.phases.length; pIdx++) {
+          setState(() {
+            _phaseIndex = pIdx;
+            _remaining = item.technique.phases[pIdx].seconds;
+            _status = 'Stay with the rhythm.';
+          });
+
+          final phase = item.technique.phases[pIdx];
+
+          _playChime();
+          _startOrb(phase);
+
+          // Say "Inhale" or "Exhale" completely before counting down
+          if (_voice != BreathingVoice.chimes) {
+            await _speakPhrase(phase.name);
+            await Future.delayed(const Duration(milliseconds: 200));
+          }
+          if (!_isValid(currentSession)) return;
+
+          // Countdown sequence: starts immediately at the phase duration (e.g. 5, 4, 3, 2, 1)
+          final bool isCounted =
+              _voice == BreathingVoice.count && _isCountedPhase(phase.name);
+
+          for (int sec = phase.seconds; sec >= 1; sec--) {
+            setState(() {
+              _remaining = sec;
+              _elapsed++;
+            });
+
+            if (isCounted) {
+              _speakDigit(sec);
+            }
+
+            await Future.delayed(const Duration(seconds: 1));
+            if (!_isValid(currentSession)) return;
+          }
+        }
+      }
+
+      // Inter-technique transition gap
+      if (tIdx + 1 < _plan.length && _gapSeconds > 0) {
         setState(() {
           _inGap = true;
-          _remaining = _gapSeconds;
           _status = 'Transition pause. Let your breathing settle.';
         });
         _orbController?.stop();
-        _speak('Rest');
-      } else {
-        _announceTechnique();
+        if (_voice != BreathingVoice.chimes) {
+          await _speakPhrase('Rest');
+        }
+
+        for (int g = _gapSeconds; g >= 1; g--) {
+          setState(() => _remaining = g);
+          await Future.delayed(const Duration(seconds: 1));
+          if (!_isValid(currentSession)) return;
+        }
+
+        setState(() => _inGap = false);
       }
-    } else {
-      _finishSession();
     }
+
+    _finishSession();
   }
 
   bool _isCountedPhase(String name) {
@@ -336,13 +376,7 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
     return lower.contains('inhale') || lower.contains('exhale');
   }
 
-  void _startPhase(int phaseIndex) {
-    final phase = _currentItem.technique.phases[phaseIndex];
-    setState(() {
-      _phaseIndex = phaseIndex;
-      _remaining = phase.seconds;
-      _status = 'Stay with the rhythm.';
-    });
+  void _startOrb(BreathingPhase phase) {
     _orbController?.dispose();
     _orbController = AnimationController(
       vsync: this,
@@ -350,7 +384,6 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
       lowerBound: _scaleForPhase(phase.name) - 0.08,
       upperBound: _scaleForPhase(phase.name) + 0.08,
     )..repeat(reverse: true);
-    _announcePhase(phase);
   }
 
   double _scaleForPhase(String name) {
@@ -360,39 +393,12 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
     return 1.0;
   }
 
-  Future<void> _announcePhase(BreathingPhase phase) async {
-    _playChime();
-    final counted =
-        _voice == BreathingVoice.count && _isCountedPhase(phase.name);
-
-    // Announce the phase and the starting number (e.g. "Inhale, 5")
-    await _speak(counted ? '${phase.name}, ${phase.seconds}' : phase.name);
-  }
-
-  Future<void> _announceTechnique() async {
-    _timer?.cancel();
-    _orbController?.stop();
-    await _announce(_currentItem.technique.name);
-    if (!mounted || !_running) return;
-    _startPhase(0);
-    if (mounted && _running) {
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
-    }
-  }
-
-  void _finishGap() {
-    setState(() {
-      _inGap = false;
-      _remaining = _currentItem.technique.phases.first.seconds;
-      _status = 'New technique. Follow the next pattern.';
-    });
-    _announceTechnique();
-  }
-
   void _finishSession() async {
-    _timer?.cancel();
+    _sessionId++;
     _orbController?.stop();
-    _tts.stop();
+    try {
+      _tts.stop();
+    } catch (_) {}
 
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
@@ -412,6 +418,8 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
       _completedDays.add(todayStr);
       _running = false;
       _complete = true;
+      _isInitialCountdown = false;
+      _inGap = false;
       _remaining = 0;
       _elapsed = _totalSeconds;
       _status = 'Session complete. Notice how you feel.';
@@ -421,6 +429,7 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
   String get _sessionLabel {
     if (_complete) return 'COMPLETE';
     if (!_running) return 'READY WHEN YOU ARE';
+    if (_isInitialCountdown) return 'STARTING SESSION';
     if (_inGap) return 'TRANSITION PAUSE';
     return 'TECHNIQUE ${_techniqueIndex + 1} OF ${_plan.length}  |  REP $_repetition OF ${_currentItem.repetitions}';
   }
@@ -428,6 +437,7 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
   String get _title {
     if (_complete) return 'Well done';
     if (!_running) return 'Choose your techniques';
+    if (_isInitialCountdown) return 'Get Ready';
     if (_inGap) return 'Prepare for the next technique';
     return _currentItem.technique.name;
   }
@@ -435,6 +445,7 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
   String get _phaseLabel {
     if (_complete) return 'Take a moment before returning to your day.';
     if (!_running) return 'Your guided session will appear here.';
+    if (_isInitialCountdown) return 'Session begins in a moment.';
     if (_inGap) return 'Rest and let your breathing settle.';
     return '${_currentPhase.name} - ${_currentItem.technique.pattern}';
   }
@@ -774,7 +785,9 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
     ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: LinearProgressIndicator(
-        value: _totalSeconds == 0 ? 0 : _elapsed / _totalSeconds,
+        value: _totalSeconds == 0
+            ? 0
+            : (_elapsed / _totalSeconds).clamp(0.0, 1.0),
         minHeight: 8,
         backgroundColor: AppColors.background,
         color: AppColors.ink,
