@@ -121,9 +121,11 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
   final FlutterTts _tts = FlutterTts();
   final TextEditingController _gapController = TextEditingController(text: '1');
   final List<BreathingPlanItem> _plan = [BreathingPlanItem(techniqueIndex: 0)];
+
   Timer? _timer;
   AnimationController? _orbController;
   BreathingVoice _voice = BreathingVoice.count;
+
   int _techniqueIndex = 0;
   int _phaseIndex = 0;
   int _repetition = 1;
@@ -134,6 +136,10 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
   bool _running = false;
   bool _complete = false;
   String _status = 'Audio guidance is available when you start.';
+
+  // Calendar State
+  Set<String> _completedDays = {};
+  DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
   bool get _hasSession => _running || _complete;
   BreathingPlanItem get _currentItem => _plan[_techniqueIndex];
@@ -149,6 +155,12 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
       _totalBreathingSeconds + _gapSeconds * (_plan.length - 1);
 
   @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
   void dispose() {
     _timer?.cancel();
     _orbController?.dispose();
@@ -156,6 +168,17 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
     _gapController.dispose();
     super.dispose();
   }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _completedDays =
+          prefs.getStringList('elateFitBreatheCompletedDays')?.toSet() ?? {};
+    });
+  }
+
+  String _dayKey(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
   Future<void> _speak(String text, {bool count = false}) async {
     if (_voice == BreathingVoice.chimes ||
@@ -338,20 +361,23 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
     _orbController?.stop();
     _tts.stop();
 
-    // Save completion to SharedPreferences
+    // Save completion to SharedPreferences and update calendar state
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
-    final todayStr =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    final completedDays =
+    final todayStr = _dayKey(now);
+    final completedDaysList =
         prefs.getStringList('elateFitBreatheCompletedDays') ?? [];
 
-    if (!completedDays.contains(todayStr)) {
-      completedDays.add(todayStr);
-      await prefs.setStringList('elateFitBreatheCompletedDays', completedDays);
+    if (!completedDaysList.contains(todayStr)) {
+      completedDaysList.add(todayStr);
+      await prefs.setStringList(
+        'elateFitBreatheCompletedDays',
+        completedDaysList,
+      );
     }
 
     setState(() {
+      _completedDays.add(todayStr);
       _running = false;
       _complete = true;
       _remaining = 0;
@@ -392,6 +418,8 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
           _setupCard(),
           const SizedBox(height: 22),
           _practiceCard(),
+          const SizedBox(height: 22),
+          _calendarCard(),
         ],
       ),
     );
@@ -733,4 +761,158 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
       ),
     ),
   ]);
+
+  Widget _calendarCard() {
+    final first = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
+    final days = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0).day;
+    final leading = first.weekday % 7;
+    return _card([
+      Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sectionTitle('BREATHING CALENDAR'),
+                const SizedBox(height: 4),
+                Text(
+                  '${_monthName(_calendarMonth.month)} ${_calendarMonth.year}',
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => setState(
+              () => _calendarMonth = DateTime(
+                _calendarMonth.year,
+                _calendarMonth.month - 1,
+              ),
+            ),
+            icon: const Icon(Icons.chevron_left_rounded),
+          ),
+          IconButton(
+            onPressed: () => setState(
+              () => _calendarMonth = DateTime(
+                _calendarMonth.year,
+                _calendarMonth.month + 1,
+              ),
+            ),
+            icon: const Icon(Icons.chevron_right_rounded),
+          ),
+        ],
+      ),
+      const SizedBox(height: 14),
+      Row(
+        children: [
+          for (final day in ['S', 'M', 'T', 'W', 'T', 'F', 'S'])
+            Expanded(
+              child: Center(
+                child: Text(
+                  day,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      GridView.count(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: 7,
+        mainAxisSpacing: 7,
+        crossAxisSpacing: 7,
+        children: [
+          for (var i = 0; i < leading; i++) const SizedBox.shrink(),
+          for (var day = 1; day <= days; day++) _calendarDay(day),
+        ],
+      ),
+      const SizedBox(height: 10),
+      Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.lime,
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Text(
+            'Completed session',
+            style: TextStyle(color: AppColors.muted, fontSize: 11),
+          ),
+        ],
+      ),
+    ]);
+  }
+
+  String _monthName(int month) => const [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ][month - 1];
+
+  Widget _calendarDay(int day) {
+    final date = DateTime(_calendarMonth.year, _calendarMonth.month, day);
+    final complete = _completedDays.contains(_dayKey(date));
+    final today = _dayKey(date) == _dayKey(DateTime.now());
+
+    return Container(
+      decoration: BoxDecoration(
+        color: complete
+            ? AppColors.lime
+            : today
+            ? AppColors.mint
+            : AppColors.background,
+        borderRadius: BorderRadius.circular(9),
+        border: today ? Border.all(color: AppColors.ink) : null,
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '$day',
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 2),
+            SizedBox(
+              height: 11,
+              child: complete
+                  ? const Icon(
+                      Icons.air_rounded,
+                      size: 10,
+                      color: AppColors.ink,
+                    )
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
