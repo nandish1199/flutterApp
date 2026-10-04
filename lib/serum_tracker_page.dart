@@ -495,25 +495,28 @@ class _SerumTrackerPageState extends State<SerumTrackerPage> {
       ],
     ),
     const SizedBox(height: 12),
-    SwitchListTile.adaptive(
-      contentPadding: EdgeInsets.zero,
-      title: const Text(
-        'Active in tracker',
-        style: TextStyle(
-          color: AppColors.ink,
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
+    Material(
+      type: MaterialType.transparency,
+      child: SwitchListTile.adaptive(
+        contentPadding: EdgeInsets.zero,
+        title: const Text(
+          'Active in tracker',
+          style: TextStyle(
+            color: AppColors.ink,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
         ),
+        subtitle: Text(
+          _active
+              ? 'Scheduled serums appear in today\'s checklist.'
+              : 'Paused serums are hidden from the checklist.',
+          style: const TextStyle(color: AppColors.muted, fontSize: 11),
+        ),
+        value: _active,
+        activeThumbColor: AppColors.ink,
+        onChanged: (value) => setState(() => _active = value),
       ),
-      subtitle: Text(
-        _active
-            ? 'Scheduled serums appear in today\'s checklist.'
-            : 'Paused serums are hidden from the checklist.',
-        style: const TextStyle(color: AppColors.muted, fontSize: 11),
-      ),
-      value: _active,
-      activeColor: AppColors.ink,
-      onChanged: (value) => setState(() => _active = value),
     ),
     const SizedBox(height: 8),
     SizedBox(

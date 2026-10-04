@@ -368,7 +368,7 @@ class HomePage extends StatelessWidget {
                 ? onOpenProgress
                 : item.title == 'Restore'
                 ? onOpenSleepSounds
-                : item.title == 'Move'
+                : item.title == 'Lift'
                 ? onOpenWorkout
                 : item.title == 'Care'
                 ? onOpenSerum
