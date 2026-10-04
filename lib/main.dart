@@ -52,6 +52,7 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final pages = [
       HomePage(
+        activityRefreshToken: _index,
         onOpenWorkout: () => _openTab(1),
         onOpenProgress: () => _openTab(2),
         onOpenSerum: () => _openTab(3),
@@ -137,6 +138,7 @@ class _MainShellState extends State<MainShell> {
 class HomePage extends StatelessWidget {
   const HomePage({
     super.key,
+    this.activityRefreshToken = 0,
     this.onOpenWorkout,
     this.onOpenProgress,
     this.onOpenSerum,
@@ -148,6 +150,7 @@ class HomePage extends StatelessWidget {
   });
 
   final VoidCallback? onOpenWorkout;
+  final int activityRefreshToken;
   final VoidCallback? onOpenProgress;
   final VoidCallback? onOpenSerum;
   final VoidCallback? onOpenBreathing;
@@ -249,6 +252,8 @@ class HomePage extends StatelessWidget {
                 _heading('Your wellness space', 'See all'),
                 const SizedBox(height: 14),
                 _features(),
+                const SizedBox(height: 26),
+                _HomeActivityCalendar(key: ValueKey(activityRefreshToken)),
                 const SizedBox(height: 26),
                 _heading('Today\'s rhythm', 'Edit plan'),
                 const SizedBox(height: 14),
@@ -663,6 +668,286 @@ class _Feature {
   final String subtitle;
   final IconData icon;
   final Color color;
+}
+
+class _HomeActivityCalendar extends StatefulWidget {
+  const _HomeActivityCalendar({super.key});
+
+  @override
+  State<_HomeActivityCalendar> createState() => _HomeActivityCalendarState();
+}
+
+class _HomeActivityCalendarState extends State<_HomeActivityCalendar> {
+  final Map<String, Set<_ActivityType>> _activities = {};
+  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActivities();
+  }
+
+  Future<void> _loadActivities() async {
+    final prefs = await SharedPreferences.getInstance();
+    final activities = <String, Set<_ActivityType>>{};
+
+    void addActivity(String day, _ActivityType activity) {
+      activities.putIfAbsent(day, () => <_ActivityType>{}).add(activity);
+    }
+
+    final workoutRaw = prefs.getString(kWorkoutEntriesStorageKey);
+    if (workoutRaw != null) {
+      try {
+        final entries = (jsonDecode(workoutRaw) as List).map(
+          (item) => WorkoutEntry.fromJson(item as Map<String, dynamic>),
+        );
+        for (final entry in entries) {
+          addActivity(_activityDayKey(entry.createdAt), _ActivityType.workout);
+        }
+      } catch (_) {}
+    }
+
+    final completedDaySources = <String, _ActivityType>{
+      'elateFitCardioCompletedDays': _ActivityType.cardio,
+      'elateFitBreatheCompletedDays': _ActivityType.breathe,
+      'elateFitStretchCompletedDays': _ActivityType.stretch,
+    };
+    for (final source in completedDaySources.entries) {
+      for (final day in prefs.getStringList(source.key) ?? <String>[]) {
+        addActivity(day, source.value);
+      }
+    }
+
+    if (mounted) {
+      setState(
+        () => _activities
+          ..clear()
+          ..addAll(activities),
+      );
+    }
+  }
+
+  String _activityDayKey(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+  String _monthName(int month) => const [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ][month - 1];
+
+  @override
+  Widget build(BuildContext context) {
+    final firstDay = DateTime(_month.year, _month.month, 1);
+    final daysInMonth = DateTime(_month.year, _month.month + 1, 0).day;
+    final leadingDays = firstDay.weekday % 7;
+    return Container(
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE9EEE9)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'ACTIVITY CALENDAR',
+                  style: TextStyle(
+                    color: HomePage.muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => setState(
+                  () => _month = DateTime(_month.year, _month.month - 1),
+                ),
+                icon: const Icon(Icons.chevron_left_rounded),
+                visualDensity: VisualDensity.compact,
+              ),
+              Text(
+                '${_monthName(_month.month)} ${_month.year}',
+                style: const TextStyle(
+                  color: HomePage.ink,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              IconButton(
+                onPressed: () => setState(
+                  () => _month = DateTime(_month.year, _month.month + 1),
+                ),
+                icon: const Icon(Icons.chevron_right_rounded),
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Row(
+            children: [
+              _CalendarWeekday('S'),
+              _CalendarWeekday('M'),
+              _CalendarWeekday('T'),
+              _CalendarWeekday('W'),
+              _CalendarWeekday('T'),
+              _CalendarWeekday('F'),
+              _CalendarWeekday('S'),
+            ],
+          ),
+          const SizedBox(height: 6),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 7,
+            mainAxisSpacing: 5,
+            crossAxisSpacing: 5,
+            childAspectRatio: .82,
+            children: [
+              for (var index = 0; index < leadingDays; index++)
+                const SizedBox.shrink(),
+              for (var day = 1; day <= daysInMonth; day++)
+                _calendarDay(DateTime(_month.year, _month.month, day)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Wrap(
+            spacing: 10,
+            runSpacing: 6,
+            children: [
+              _ActivityLegend(Icons.fitness_center_rounded, 'Workout'),
+              _ActivityLegend(Icons.directions_run_rounded, 'Cardio'),
+              _ActivityLegend(Icons.air_rounded, 'Breathe'),
+              _ActivityLegend(Icons.accessibility_new_rounded, 'Stretch'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _calendarDay(DateTime date) {
+    final activities = _activities[_activityDayKey(date)] ?? const {};
+    const activityOrder = [
+      _ActivityType.workout,
+      _ActivityType.cardio,
+      _ActivityType.breathe,
+      _ActivityType.stretch,
+    ];
+    final orderedActivities = activityOrder.where(activities.contains).toList();
+    final today =
+        date.year == DateTime.now().year &&
+        date.month == DateTime.now().month &&
+        date.day == DateTime.now().day;
+    return Container(
+      decoration: BoxDecoration(
+        color: activities.isEmpty
+            ? HomePage.muted.withAlpha(12)
+            : HomePage.lime,
+        borderRadius: BorderRadius.circular(8),
+        border: today ? Border.all(color: HomePage.ink) : null,
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+      child: Column(
+        children: [
+          Text(
+            '${date.day}',
+            style: const TextStyle(
+              color: HomePage.ink,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Column(
+            children: [
+              for (var row = 0; row < 2; row++)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    for (var column = 0; column < 2; column++)
+                      _activityIcon(orderedActivities, row * 2 + column),
+                  ],
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _activityIcon(List<_ActivityType> activities, int index) {
+    if (index >= activities.length) {
+      return const SizedBox(width: 14, height: 14);
+    }
+    return SizedBox(
+      width: 14,
+      height: 14,
+      child: Icon(activities[index].icon, color: HomePage.ink, size: 12),
+    );
+  }
+}
+
+enum _ActivityType { workout, cardio, breathe, stretch }
+
+extension on _ActivityType {
+  IconData get icon => switch (this) {
+    _ActivityType.workout => Icons.fitness_center_rounded,
+    _ActivityType.cardio => Icons.directions_run_rounded,
+    _ActivityType.breathe => Icons.air_rounded,
+    _ActivityType.stretch => Icons.accessibility_new_rounded,
+  };
+}
+
+class _CalendarWeekday extends StatelessWidget {
+  const _CalendarWeekday(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Center(
+      child: Text(
+        label,
+        style: TextStyle(
+          color: HomePage.muted,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    ),
+  );
+}
+
+class _ActivityLegend extends StatelessWidget {
+  const _ActivityLegend(this.icon, this.label);
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, color: HomePage.muted, size: 13),
+      const SizedBox(width: 4),
+      Text(label, style: const TextStyle(color: HomePage.muted, fontSize: 10)),
+    ],
+  );
 }
 
 class _PlanItem extends StatelessWidget {

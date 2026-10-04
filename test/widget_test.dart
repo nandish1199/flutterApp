@@ -17,6 +17,11 @@ void main() {
 
     await tester.pumpWidget(const ElateFitApp());
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Your wellness space'),
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
 
     expect(find.text('Your wellness space'), findsOneWidget);
   });
@@ -29,9 +34,14 @@ void main() {
     await tester.pumpWidget(const ElateFitApp());
     await tester.pumpAndSettle();
     final weightTracker = find.text('Weight tracker');
-    await tester.drag(find.byType(Scrollable).first, const Offset(0, -700));
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -1000));
     await tester.pumpAndSettle();
-    await tester.tap(weightTracker);
+    final weightCard = find.ancestor(
+      of: weightTracker,
+      matching: find.byType(InkWell),
+    );
+    await tester.ensureVisible(weightCard);
+    await tester.tap(weightCard);
     await tester.pumpAndSettle();
 
     expect(find.text('Progress starts today'), findsOneWidget);
