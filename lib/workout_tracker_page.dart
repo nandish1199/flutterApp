@@ -708,12 +708,7 @@ class _WorkoutTrackerPageState extends State<WorkoutTrackerPage> {
     final reps = entries.fold<int>(0, (sum, entry) => sum + entry.reps);
     final volume = entries.fold<double>(0, (sum, entry) => sum + entry.volume);
     return _card([
-      Row(
-        children: [
-          Expanded(child: _sectionTitle('TRAINING SUMMARY')),
-          _rangeSelector(),
-        ],
-      ),
+      Row(children: [Expanded(child: _sectionTitle('TRAINING SUMMARY'))]),
       const SizedBox(height: 14),
       GridView.count(
         shrinkWrap: true,
@@ -955,86 +950,112 @@ class _WorkoutTrackerPageState extends State<WorkoutTrackerPage> {
       _range,
       (index) => today.subtract(Duration(days: _range - 1 - index)),
     );
-    final values = dates
+    final dailyEntries = dates.map((date) {
+      final dayKey = workoutDayKey(date);
+      return _entries
+          .where((entry) => workoutDayKey(entry.createdAt) == dayKey)
+          .toList();
+    }).toList();
+    final weights = dailyEntries
         .map(
-          (date) => _entries
-              .where(
-                (entry) =>
-                    workoutDayKey(entry.createdAt) == workoutDayKey(date),
-              )
-              .fold<double>(0, (sum, entry) => sum + entry.volume),
+          (entries) => entries.isEmpty
+              ? 0.0
+              : entries
+                    .map((entry) => entry.weight)
+                    .reduce((a, b) => a > b ? a : b),
         )
         .toList();
-    final maxValue = values.fold<double>(0, (a, b) => b > a ? b : a);
+    final volumes = dailyEntries
+        .map(
+          (entries) =>
+              entries.fold<double>(0, (sum, entry) => sum + entry.volume),
+        )
+        .toList();
+
     return _card([
       Row(
         children: [
-          Expanded(child: _sectionTitle('VOLUME PROGRESSION')),
+          Expanded(child: _sectionTitle('WORKOUT TRENDS')),
+          _rangeSelector(),
+        ],
+      ),
+      const SizedBox(height: 16),
+      _lineChart(
+        title: 'Weight',
+        value: weights.fold<double>(
+          0,
+          (latest, value) => value > 0 ? value : latest,
+        ),
+        unit: 'kg latest',
+        values: weights,
+        color: AppColors.ink,
+      ),
+      const SizedBox(height: 18),
+      _lineChart(
+        title: 'Volume',
+        value: volumes.fold<double>(0, (sum, value) => sum + value),
+        unit: 'kg total',
+        values: volumes,
+        color: AppColors.success,
+      ),
+      const SizedBox(height: 8),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
           Text(
-            'kg',
+            '${dates.first.month}/${dates.first.day}',
+            style: const TextStyle(color: AppColors.muted, fontSize: 10),
+          ),
+          Text(
+            '${dates.last.month}/${dates.last.day}',
+            style: const TextStyle(color: AppColors.muted, fontSize: 10),
+          ),
+        ],
+      ),
+    ]);
+  }
+
+  Widget _lineChart({
+    required String title,
+    required double value,
+    required String unit,
+    required List<double> values,
+    required Color color,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Text(
+            '${_num(value)} $unit',
             style: const TextStyle(
               color: AppColors.muted,
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w700,
             ),
           ),
         ],
       ),
-      const SizedBox(height: 15),
+      const SizedBox(height: 8),
       SizedBox(
-        height: 120,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            for (var index = 0; index < values.length; index++)
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      if (values[index] > 0)
-                        Text(
-                          _num(values[index]),
-                          maxLines: 1,
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 7,
-                          ),
-                        ),
-                      const SizedBox(height: 4),
-                      Container(
-                        height: maxValue == 0
-                            ? 4
-                            : 4 + 72 * values[index] / maxValue,
-                        decoration: BoxDecoration(
-                          color: index == values.length - 1
-                              ? AppColors.ink
-                              : AppColors.lime,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      if (index == 0 ||
-                          index == values.length - 1 ||
-                          index == values.length ~/ 2)
-                        Text(
-                          '${dates[index].day}',
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
+        height: 118,
+        width: double.infinity,
+        child: CustomPaint(
+          painter: _WorkoutLineChartPainter(values: values, color: color),
         ),
       ),
-    ]);
-  }
+    ],
+  );
 
   Widget _trainingLogCard(List<WorkoutEntry> entries) => _card([
     Row(
@@ -1130,4 +1151,67 @@ class _WorkoutTrackerPageState extends State<WorkoutTrackerPage> {
       ),
     ],
   );
+}
+
+class _WorkoutLineChartPainter extends CustomPainter {
+  const _WorkoutLineChartPainter({required this.values, required this.color});
+
+  final List<double> values;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final left = 8.0;
+    final top = 8.0;
+    final right = size.width - 8.0;
+    final bottom = size.height - 8.0;
+    final width = right - left;
+    final height = bottom - top;
+    final maximum = values.fold<double>(
+      0,
+      (current, value) => value > current ? value : current,
+    );
+    final scale = maximum == 0 ? 1.0 : maximum;
+    final gridPaint = Paint()
+      ..color = AppColors.line
+      ..strokeWidth = 1;
+    final linePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final pointPaint = Paint()..color = color;
+
+    for (var index = 0; index < 3; index++) {
+      final y = top + height * index / 2;
+      canvas.drawLine(Offset(left, y), Offset(right, y), gridPaint);
+    }
+
+    if (values.isEmpty) return;
+    final path = Path();
+    final points = <Offset>[];
+    for (var index = 0; index < values.length; index++) {
+      final x = values.length == 1
+          ? left + width / 2
+          : left + width * index / (values.length - 1);
+      final y = bottom - height * (values[index] / scale);
+      final point = Offset(x, y);
+      points.add(point);
+      if (index == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(path, linePaint);
+    for (final point in points) {
+      canvas.drawCircle(point, 3.5, pointPaint);
+      canvas.drawCircle(point, 1.5, Paint()..color = AppColors.paper);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WorkoutLineChartPainter oldDelegate) =>
+      oldDelegate.values != values || oldDelegate.color != color;
 }
