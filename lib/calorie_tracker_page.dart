@@ -543,6 +543,69 @@ class NutritionTotals {
   }
 }
 
+class _NutritionLineChartPainter extends CustomPainter {
+  const _NutritionLineChartPainter({required this.values, required this.color});
+
+  final List<double> values;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final left = 8.0;
+    final top = 8.0;
+    final right = size.width - 8.0;
+    final bottom = size.height - 8.0;
+    final width = right - left;
+    final height = bottom - top;
+    final maximum = values.fold<double>(
+      0,
+      (current, value) => value > current ? value : current,
+    );
+    final scale = maximum == 0 ? 1.0 : maximum;
+    final gridPaint = Paint()
+      ..color = AppColors.line
+      ..strokeWidth = 1;
+    final linePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final pointPaint = Paint()..color = color;
+
+    for (var index = 0; index < 3; index++) {
+      final y = top + height * index / 2;
+      canvas.drawLine(Offset(left, y), Offset(right, y), gridPaint);
+    }
+
+    if (values.isEmpty) return;
+    final path = Path();
+    final points = <Offset>[];
+    for (var index = 0; index < values.length; index++) {
+      final x = values.length == 1
+          ? left + width / 2
+          : left + width * index / (values.length - 1);
+      final y = bottom - height * (values[index] / scale);
+      final point = Offset(x, y);
+      points.add(point);
+      if (index == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(path, linePaint);
+    for (final point in points) {
+      canvas.drawCircle(point, 3.5, pointPaint);
+      canvas.drawCircle(point, 1.5, Paint()..color = AppColors.paper);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _NutritionLineChartPainter oldDelegate) =>
+      oldDelegate.values != values || oldDelegate.color != color;
+}
+
 /// Calorie intake journal. Entries are stored in local storage
 /// (SharedPreferences) as a JSON list, like the web version's IndexedDB.
 class CalorieTrackerPage extends StatefulWidget {
@@ -563,6 +626,7 @@ class _CalorieTrackerPageState extends State<CalorieTrackerPage> {
   UserProfile? _profile;
   String _status = '';
   bool _statusIsError = false;
+  int _chartRange = 7;
 
   @override
   void initState() {
@@ -734,7 +798,7 @@ class _CalorieTrackerPageState extends State<CalorieTrackerPage> {
           const SizedBox(height: 22),
           _targetsCard(totals),
           const SizedBox(height: 22),
-          _weekCard(),
+          _intakeTrendsCard(),
           const SizedBox(height: 22),
           _entriesCard(todayEntries),
         ],
@@ -1167,75 +1231,130 @@ class _CalorieTrackerPageState extends State<CalorieTrackerPage> {
     );
   }
 
-  Widget _weekCard() {
-    final now = DateTime.now();
-    final days = List.generate(7, (index) {
-      final day = now.subtract(Duration(days: 6 - index));
+  Widget _intakeTrendsCard() {
+    final today = DateTime.now();
+    final dates = List.generate(_chartRange, (index) {
+      final day = today.subtract(Duration(days: _chartRange - 1 - index));
       return DateTime(day.year, day.month, day.day);
     });
-    final values = days
-        .map(
-          (day) => _totalsFor(
-            _entries.where((entry) => _isSameDay(entry.timestamp, day)),
-          ).calories,
-        )
-        .toList();
-    final maxValue = values.fold<double>(0, (a, b) => b > a ? b : a);
-    const dayLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    final dailyTotals = dates.map((day) {
+      return _totalsFor(
+        _entries.where((entry) => _isSameDay(entry.timestamp, day)),
+      );
+    }).toList();
+    final calories = dailyTotals.map((total) => total.calories).toList();
+    final protein = dailyTotals.map((total) => total.protein).toList();
+
     return _card(
       children: [
-        _sectionTitle('LAST 7 DAYS · CALORIES'),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 122,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              for (var i = 0; i < 7; i++)
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          values[i] > 0 ? _num(values[i]) : '',
-                          maxLines: 1,
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          height: maxValue <= 0
-                              ? 4
-                              : 4 + (76 * values[i] / maxValue),
-                          decoration: BoxDecoration(
-                            color: i == 6 ? AppColors.ink : AppColors.lime,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          dayLetters[days[i].weekday - 1],
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
+        Row(
+          children: [
+            Expanded(child: _sectionTitle('INTAKE TRENDS')),
+            PopupMenuButton<int>(
+              initialValue: _chartRange,
+              onSelected: (value) => setState(() => _chartRange = value),
+              color: AppColors.paper,
+              itemBuilder: (context) => [7, 15, 30]
+                  .map(
+                    (value) =>
+                        PopupMenuItem(value: value, child: Text('$value days')),
+                  )
+                  .toList(),
+              child: Row(
+                children: [
+                  Text(
+                    '$_chartRange days',
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-            ],
-          ),
+                  const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 17,
+                    color: AppColors.muted,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _lineChart(
+          title: 'Calories',
+          value: calories.fold<double>(0, (sum, value) => sum + value),
+          unit: 'kcal total',
+          values: calories,
+          color: AppColors.ink,
+        ),
+        const SizedBox(height: 18),
+        _lineChart(
+          title: 'Protein',
+          value: protein.fold<double>(0, (sum, value) => sum + value),
+          unit: 'g total',
+          values: protein,
+          color: AppColors.success,
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '${dates.first.month}/${dates.first.day}',
+              style: const TextStyle(color: AppColors.muted, fontSize: 10),
+            ),
+            Text(
+              '${dates.last.month}/${dates.last.day}',
+              style: const TextStyle(color: AppColors.muted, fontSize: 10),
+            ),
+          ],
         ),
       ],
     );
   }
+
+  Widget _lineChart({
+    required String title,
+    required double value,
+    required String unit,
+    required List<double> values,
+    required Color color,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Text(
+            '${_num(value)} $unit',
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      SizedBox(
+        height: 118,
+        width: double.infinity,
+        child: CustomPaint(
+          painter: _NutritionLineChartPainter(values: values, color: color),
+        ),
+      ),
+    ],
+  );
 
   Widget _entriesCard(List<FoodEntry> todayEntries) => _card(
     children: [
