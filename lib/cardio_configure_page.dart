@@ -463,7 +463,12 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
           color: AppColors.ink,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Icon(Icons.bolt_rounded, color: AppColors.lime, size: 25),
+        // Changed icon from bolt_rounded to directions_run_rounded
+        child: const Icon(
+          Icons.directions_run_rounded,
+          color: AppColors.lime,
+          size: 25,
+        ),
       ),
       const SizedBox(width: 12),
       const Expanded(
@@ -1063,8 +1068,9 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
             SizedBox(
               height: 11,
               child: complete
+                  // Changed icon from favorite_rounded to directions_run_rounded
                   ? const Icon(
-                      Icons.favorite_rounded,
+                      Icons.directions_run_rounded,
                       size: 10,
                       color: AppColors.ink,
                     )

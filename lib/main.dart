@@ -56,6 +56,7 @@ class _MainShellState extends State<MainShell> {
         onOpenProgress: () => _openTab(2),
         onOpenSerum: () => _openTab(3),
         onOpenBreathing: () => _openTab(4),
+        onOpenCardio: () => _openTab(5), // Added route for the new widget
         onOpenWeight: () => Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => WeightTrackerPage(
@@ -117,8 +118,9 @@ class _MainShellState extends State<MainShell> {
             label: 'Breathe',
           ),
           NavigationDestination(
-            icon: Icon(Icons.bolt_outlined),
-            selectedIcon: Icon(Icons.bolt),
+            // Changed from bolt_outlined / bolt
+            icon: Icon(Icons.directions_run_outlined),
+            selectedIcon: Icon(Icons.directions_run),
             label: 'Cardio',
           ),
           NavigationDestination(
@@ -142,6 +144,7 @@ class HomePage extends StatelessWidget {
     this.onOpenWeight,
     this.onOpenSleepSounds,
     this.onOpenStretching,
+    this.onOpenCardio, // Added property
   });
 
   final VoidCallback? onOpenWorkout;
@@ -151,6 +154,7 @@ class HomePage extends StatelessWidget {
   final VoidCallback? onOpenWeight;
   final VoidCallback? onOpenSleepSounds;
   final VoidCallback? onOpenStretching;
+  final VoidCallback? onOpenCardio; // Added property
 
   static const ink = AppColors.ink;
   static const muted = AppColors.muted;
@@ -544,6 +548,8 @@ class HomePage extends StatelessWidget {
         Icons.monitor_weight_rounded,
         peach,
       ),
+      // Added Cardio block to the grid
+      _Feature('Cardio', 'Cardio builder', Icons.directions_run_rounded, lime),
     ];
     return GridView.builder(
       shrinkWrap: true,
@@ -576,6 +582,9 @@ class HomePage extends StatelessWidget {
                 ? onOpenStretching
                 : item.title == 'Balance'
                 ? onOpenWeight
+                : item.title ==
+                      'Cardio' // Mapped Cardio routing
+                ? onOpenCardio
                 : null,
             child: Padding(
               padding: const EdgeInsets.all(15),
