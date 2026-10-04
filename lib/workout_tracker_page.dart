@@ -211,6 +211,7 @@ class _WorkoutTrackerPageState extends State<WorkoutTrackerPage> {
   String _status = '';
   bool _statusIsError = false;
   int _range = 7;
+  DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
   @override
   void initState() {
@@ -791,26 +792,85 @@ class _WorkoutTrackerPageState extends State<WorkoutTrackerPage> {
   );
 
   Widget _calendarCard() {
-    final today = dateOnly(DateTime.now());
-    final dates = List.generate(
-      7,
-      (index) => today.subtract(Duration(days: 6 - index)),
-    );
+    final first = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
+    final days = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0).day;
+    final leading = first.weekday % 7;
     final workoutDays = _entries
         .map((entry) => workoutDayKey(entry.createdAt))
         .toSet();
     return _card([
-      _sectionTitle('THIS WEEK'),
+      Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sectionTitle('WORKOUT CALENDAR'),
+                const SizedBox(height: 4),
+                Text(
+                  '${_monthName(_calendarMonth.month)} ${_calendarMonth.year}',
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => setState(
+              () => _calendarMonth = DateTime(
+                _calendarMonth.year,
+                _calendarMonth.month - 1,
+              ),
+            ),
+            icon: const Icon(Icons.chevron_left_rounded),
+          ),
+          IconButton(
+            onPressed: () => setState(
+              () => _calendarMonth = DateTime(
+                _calendarMonth.year,
+                _calendarMonth.month + 1,
+              ),
+            ),
+            icon: const Icon(Icons.chevron_right_rounded),
+          ),
+        ],
+      ),
       const SizedBox(height: 14),
       Row(
         children: [
-          for (final date in dates)
+          for (final day in ['S', 'M', 'T', 'W', 'T', 'F', 'S'])
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: _calendarDay(
-                  date,
-                  workoutDays.contains(workoutDayKey(date)),
+              child: Center(
+                child: Text(
+                  day,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      GridView.count(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: 7,
+        mainAxisSpacing: 7,
+        crossAxisSpacing: 7,
+        children: [
+          for (var i = 0; i < leading; i++) const SizedBox.shrink(),
+          for (var day = 1; day <= days; day++)
+            _calendarDay(
+              DateTime(_calendarMonth.year, _calendarMonth.month, day),
+              workoutDays.contains(
+                workoutDayKey(
+                  DateTime(_calendarMonth.year, _calendarMonth.month, day),
                 ),
               ),
             ),
@@ -819,7 +879,7 @@ class _WorkoutTrackerPageState extends State<WorkoutTrackerPage> {
       const SizedBox(height: 12),
       const Row(
         children: [
-          Icon(Icons.fitness_center, color: AppColors.muted, size: 15),
+          Icon(Icons.fitness_center_rounded, color: AppColors.muted, size: 15),
           SizedBox(width: 6),
           Text(
             'Workout completed',
@@ -830,45 +890,54 @@ class _WorkoutTrackerPageState extends State<WorkoutTrackerPage> {
     ]);
   }
 
+  String _monthName(int month) => const [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ][month - 1];
+
   Widget _calendarDay(DateTime date, bool complete) {
-    const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     final today = _isToday(date);
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 9),
       decoration: BoxDecoration(
         color: complete ? AppColors.lime : AppColors.background,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: today ? AppColors.ink : AppColors.line,
-          width: today ? 1.5 : 1,
-        ),
+        borderRadius: BorderRadius.circular(9),
+        border: today ? Border.all(color: AppColors.ink) : null,
       ),
-      child: Column(
-        children: [
-          Text(
-            days[date.weekday - 1],
-            style: const TextStyle(
-              color: AppColors.muted,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '${date.day}',
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            '${date.day}',
-            style: const TextStyle(
-              color: AppColors.ink,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
+            const SizedBox(height: 2),
+            SizedBox(
+              height: 11,
+              child: complete
+                  ? const Icon(
+                      Icons.fitness_center_rounded,
+                      size: 10,
+                      color: AppColors.ink,
+                    )
+                  : null,
             ),
-          ),
-          const SizedBox(height: 4),
-          Icon(
-            complete ? Icons.check_circle_rounded : Icons.circle_outlined,
-            color: complete ? AppColors.ink : AppColors.soft,
-            size: 14,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
