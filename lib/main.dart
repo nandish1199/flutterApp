@@ -7,6 +7,7 @@ import 'calorie_tracker_page.dart';
 import 'profile_page.dart';
 import 'serum_tracker_page.dart';
 import 'sleep_sounds_page.dart';
+import 'stretching_configure_page.dart'; // Added Import
 import 'workout_tracker_page.dart';
 import 'weight_tracker_page.dart';
 
@@ -65,6 +66,11 @@ class _MainShellState extends State<MainShell> {
         onOpenSleepSounds: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const SleepSoundsPage()),
         ),
+        onOpenStretching: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const StretchingConfigurePage(),
+          ),
+        ), // Added Stretching Route Navigation
       ),
       const WorkoutTrackerPage(),
       CalorieTrackerPage(onOpenProfile: () => _openTab(6)),
@@ -132,6 +138,7 @@ class HomePage extends StatelessWidget {
     this.onOpenBreathing,
     this.onOpenWeight,
     this.onOpenSleepSounds,
+    this.onOpenStretching, // New Action
   });
 
   final VoidCallback? onOpenWorkout;
@@ -140,6 +147,7 @@ class HomePage extends StatelessWidget {
   final VoidCallback? onOpenBreathing;
   final VoidCallback? onOpenWeight;
   final VoidCallback? onOpenSleepSounds;
+  final VoidCallback? onOpenStretching;
 
   static const ink = AppColors.ink;
   static const muted = AppColors.muted;
@@ -332,17 +340,19 @@ class HomePage extends StatelessWidget {
   );
 
   Widget _features() {
+    // Split the existing "Reset (Stretch & breathe)" into two separate dedicated tiles.
     const items = [
       _Feature('Lift', 'Workout tracker', Icons.fitness_center, peach),
       _Feature('Fuel', 'Calorie tracker', Icons.ramen_dining, lime),
       _Feature('Restore', 'Sleep sounds', Icons.nightlight_round, lavender),
       _Feature('Care', 'Medicine intake', Icons.medication_rounded, mint),
+      _Feature('Breathe', 'Breathing exercise', Icons.air, mint),
       _Feature(
-        'Reset',
-        'Stretch & breathe',
-        Icons.self_improvement_rounded,
-        mint,
-      ),
+        'Stretch',
+        'Stretching routine',
+        Icons.accessibility_new_rounded,
+        lavender,
+      ), // Added New Stretching Tile
       _Feature(
         'Balance',
         'Weight tracker',
@@ -375,8 +385,10 @@ class HomePage extends StatelessWidget {
                 ? onOpenWorkout
                 : item.title == 'Care'
                 ? onOpenSerum
-                : item.title == 'Reset'
+                : item.title == 'Breathe'
                 ? onOpenBreathing
+                : item.title == 'Stretch'
+                ? onOpenStretching // Connects Stretching Route
                 : item.title == 'Balance'
                 ? onOpenWeight
                 : null,
