@@ -213,12 +213,19 @@ class HomePage extends StatelessWidget {
         prefs.getStringList('elateFitStretchCompletedDays') ?? [];
     if (stretchDays.contains(todayStr)) stretchDone = true;
 
+    // Added Breathing Check
+    bool breatheDone = false;
+    final breatheDays =
+        prefs.getStringList('elateFitBreatheCompletedDays') ?? [];
+    if (breatheDays.contains(todayStr)) breatheDone = true;
+
     return {
       'calories': calories,
       'protein': protein,
       'workoutDone': workoutDone,
       'cardioDone': cardioDone,
       'stretchDone': stretchDone,
+      'breatheDone': breatheDone, // Added to return map
     };
   }
 
@@ -304,6 +311,7 @@ class HomePage extends StatelessWidget {
             'workoutDone': false,
             'cardioDone': false,
             'stretchDone': false,
+            'breatheDone': false, // Added default fallback
           };
 
       final now = DateTime.now();
@@ -438,6 +446,11 @@ class HomePage extends StatelessWidget {
                   data['stretchDone'],
                   'Stretch',
                 ),
+                _taskIcon(
+                  Icons.air_rounded,
+                  data['breatheDone'],
+                  'Breathe',
+                ), // Added new Breathe icon
               ],
             ),
           ],

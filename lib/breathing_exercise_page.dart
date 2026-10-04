@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_colors.dart';
 
@@ -332,10 +333,24 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
     _announceTechnique();
   }
 
-  void _finishSession() {
+  void _finishSession() async {
     _timer?.cancel();
     _orbController?.stop();
     _tts.stop();
+
+    // Save completion to SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now();
+    final todayStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final completedDays =
+        prefs.getStringList('elateFitBreatheCompletedDays') ?? [];
+
+    if (!completedDays.contains(todayStr)) {
+      completedDays.add(todayStr);
+      await prefs.setStringList('elateFitBreatheCompletedDays', completedDays);
+    }
+
     setState(() {
       _running = false;
       _complete = true;
