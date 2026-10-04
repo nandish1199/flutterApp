@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_colors.dart';
 import 'breathing_exercise_page.dart';
@@ -70,7 +73,7 @@ class _MainShellState extends State<MainShell> {
           MaterialPageRoute<void>(
             builder: (_) => const StretchingConfigurePage(),
           ),
-        ), // Added Stretching Route Navigation
+        ),
       ),
       const WorkoutTrackerPage(),
       CalorieTrackerPage(onOpenProfile: () => _openTab(6)),
@@ -138,7 +141,7 @@ class HomePage extends StatelessWidget {
     this.onOpenBreathing,
     this.onOpenWeight,
     this.onOpenSleepSounds,
-    this.onOpenStretching, // New Action
+    this.onOpenStretching,
   });
 
   final VoidCallback? onOpenWorkout;
@@ -155,6 +158,69 @@ class HomePage extends StatelessWidget {
   static const mint = AppColors.mint;
   static const peach = AppColors.peach;
   static const lavender = AppColors.lavender;
+
+  Future<Map<String, dynamic>> _fetchSnapshotData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now();
+    final todayStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    double calories = 0;
+    double protein = 0;
+    final foodRaw = prefs.getString(kFoodEntriesStorageKey);
+    if (foodRaw != null) {
+      try {
+        final items = jsonDecode(foodRaw) as List;
+        for (final item in items) {
+          final entry = FoodEntry.fromJson(item as Map<String, dynamic>);
+          if (entry.timestamp.year == now.year &&
+              entry.timestamp.month == now.month &&
+              entry.timestamp.day == now.day) {
+            final food = entry.food;
+            if (food != null) {
+              final factor = entry.grams / 100;
+              calories += food.calories * factor;
+              protein += food.protein * factor;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    bool workoutDone = false;
+    final workoutRaw = prefs.getString(kWorkoutEntriesStorageKey);
+    if (workoutRaw != null) {
+      try {
+        final items = jsonDecode(workoutRaw) as List;
+        for (final item in items) {
+          final entry = WorkoutEntry.fromJson(item as Map<String, dynamic>);
+          if (entry.createdAt.year == now.year &&
+              entry.createdAt.month == now.month &&
+              entry.createdAt.day == now.day) {
+            workoutDone = true;
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+
+    bool cardioDone = false;
+    final cardioDays = prefs.getStringList('elateFitCardioCompletedDays') ?? [];
+    if (cardioDays.contains(todayStr)) cardioDone = true;
+
+    bool stretchDone = false;
+    final stretchDays =
+        prefs.getStringList('elateFitStretchCompletedDays') ?? [];
+    if (stretchDays.contains(todayStr)) stretchDone = true;
+
+    return {
+      'calories': calories,
+      'protein': protein,
+      'workoutDone': workoutDone,
+      'cardioDone': cardioDone,
+      'stretchDone': stretchDone,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -218,104 +284,211 @@ class HomePage extends StatelessWidget {
       ),
       IconButton(
         onPressed: null,
-        style: ButtonStyle(
+        style: const ButtonStyle(
           backgroundColor: WidgetStatePropertyAll(Colors.white),
-          foregroundColor: const WidgetStatePropertyAll(ink),
+          foregroundColor: WidgetStatePropertyAll(ink),
         ),
         icon: const Icon(Icons.notifications_none_rounded),
       ),
     ],
   );
 
-  Widget _snapshot() => Container(
-    padding: const EdgeInsets.all(22),
-    decoration: BoxDecoration(
-      color: ink,
-      borderRadius: BorderRadius.circular(28),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'DAILY SNAPSHOT',
-              style: TextStyle(
-                color: lime,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(24),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'MON, 12 AUG',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
+  Widget _snapshot() => FutureBuilder<Map<String, dynamic>>(
+    future: _fetchSnapshotData(),
+    builder: (context, snapshot) {
+      final data =
+          snapshot.data ??
+          {
+            'calories': 0.0,
+            'protein': 0.0,
+            'workoutDone': false,
+            'cardioDone': false,
+            'stretchDone': false,
+          };
+
+      final now = DateTime.now();
+      const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+      const months = [
+        'JAN',
+        'FEB',
+        'MAR',
+        'APR',
+        'MAY',
+        'JUN',
+        'JUL',
+        'AUG',
+        'SEP',
+        'OCT',
+        'NOV',
+        'DEC',
+      ];
+      final dateStr =
+          '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
+
+      return Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: ink,
+          borderRadius: BorderRadius.circular(28),
         ),
-        const SizedBox(height: 18),
-        const Text(
-          'A little progress\nis still progress.',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 27,
-            height: 1.12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 22),
-        Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Expanded(
-              child: Text(
-                'You have completed 68%\nof your wellness plan.',
-                style: TextStyle(
-                  color: Color(0xFFB6C3BC),
-                  height: 1.35,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-            SizedBox(
-              width: 64,
-              height: 64,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    value: .68,
-                    strokeWidth: 6,
-                    backgroundColor: Colors.white12,
-                    valueColor: const AlwaysStoppedAnimation(lime),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'DAILY SNAPSHOT',
+                  style: TextStyle(
+                    color: lime,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
                   ),
-                  const Text(
-                    '68%',
-                    style: TextStyle(
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(24),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    dateStr,
+                    style: const TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Calories Intake',
+                        style: TextStyle(
+                          color: Color(0xFFB6C3BC),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${data['calories']!.toStringAsFixed(0)} kcal',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Protein Intake',
+                        style: TextStyle(
+                          color: Color(0xFFB6C3BC),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${data['protein']!.toStringAsFixed(0)} g',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 28),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _taskIcon(
+                  Icons.fitness_center_rounded,
+                  data['workoutDone'],
+                  'Workout',
+                ),
+                _taskIcon(
+                  Icons.directions_run_rounded,
+                  data['cardioDone'],
+                  'Cardio',
+                ),
+                _taskIcon(
+                  Icons.accessibility_new_rounded,
+                  data['stretchDone'],
+                  'Stretch',
+                ),
+              ],
             ),
           ],
         ),
-      ],
-    ),
+      );
+    },
   );
+
+  Widget _taskIcon(IconData icon, bool isCompleted, String label) {
+    return Column(
+      children: [
+        Stack(
+          alignment: Alignment.topRight,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isCompleted
+                    ? lime.withAlpha(50)
+                    : Colors.white.withAlpha(15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: isCompleted ? lime : Colors.white54,
+                size: 26,
+              ),
+            ),
+            if (isCompleted)
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: lime,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check, color: ink, size: 12),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: isCompleted ? Colors.white : Colors.white54,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _heading(String title, String action) => Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -340,7 +513,6 @@ class HomePage extends StatelessWidget {
   );
 
   Widget _features() {
-    // Split the existing "Reset (Stretch & breathe)" into two separate dedicated tiles.
     const items = [
       _Feature('Lift', 'Workout tracker', Icons.fitness_center, peach),
       _Feature('Fuel', 'Calorie tracker', Icons.ramen_dining, lime),
@@ -352,7 +524,7 @@ class HomePage extends StatelessWidget {
         'Stretching routine',
         Icons.accessibility_new_rounded,
         lavender,
-      ), // Added New Stretching Tile
+      ),
       _Feature(
         'Balance',
         'Weight tracker',
@@ -388,7 +560,7 @@ class HomePage extends StatelessWidget {
                 : item.title == 'Breathe'
                 ? onOpenBreathing
                 : item.title == 'Stretch'
-                ? onOpenStretching // Connects Stretching Route
+                ? onOpenStretching
                 : item.title == 'Balance'
                 ? onOpenWeight
                 : null,
