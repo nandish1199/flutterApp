@@ -1048,16 +1048,30 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
         border: today ? Border.all(color: AppColors.ink) : null,
       ),
       child: Center(
-        child: complete
-            ? const Icon(Icons.favorite_rounded, size: 13, color: AppColors.ink)
-            : Text(
-                '$day',
-                style: const TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '$day',
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
               ),
+            ),
+            const SizedBox(height: 2),
+            SizedBox(
+              height: 11,
+              child: complete
+                  ? const Icon(
+                      Icons.favorite_rounded,
+                      size: 10,
+                      color: AppColors.ink,
+                    )
+                  : null,
+            ),
+          ],
+        ),
       ),
     );
   }
