@@ -71,7 +71,9 @@ class ProgressPhoto {
 }
 
 class WeightTrackerPage extends StatefulWidget {
-  const WeightTrackerPage({super.key});
+  const WeightTrackerPage({super.key, this.onNavigate});
+
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<WeightTrackerPage> createState() => _WeightTrackerPageState();
@@ -242,21 +244,68 @@ class _WeightTrackerPageState extends State<WeightTrackerPage> {
   ];
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    child: ListView(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-      children: [
-        _intro(),
-        const SizedBox(height: 18),
-        _measurementCard(),
-        const SizedBox(height: 18),
-        _trendCard(),
-        const SizedBox(height: 18),
-        _goalCard(),
-        const SizedBox(height: 18),
-        _historyCard(),
-        const SizedBox(height: 18),
-        _photosCard(),
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.background,
+    body: SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+        children: [
+          _intro(),
+          const SizedBox(height: 18),
+          _measurementCard(),
+          const SizedBox(height: 18),
+          _trendCard(),
+          const SizedBox(height: 18),
+          _goalCard(),
+          const SizedBox(height: 18),
+          _historyCard(),
+          const SizedBox(height: 18),
+          _photosCard(),
+        ],
+      ),
+    ),
+    bottomNavigationBar: NavigationBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      selectedIndex: 0,
+      indicatorColor: AppColors.lime,
+      onDestinationSelected: widget.onNavigate,
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home),
+          label: 'Home',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.fitness_center_outlined),
+          selectedIcon: Icon(Icons.fitness_center),
+          label: 'Workout',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.ramen_dining),
+          selectedIcon: Icon(Icons.ramen_dining),
+          label: 'Calories',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.auto_awesome_outlined),
+          selectedIcon: Icon(Icons.auto_awesome),
+          label: 'Serum',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.air_outlined),
+          selectedIcon: Icon(Icons.air),
+          label: 'Breathe',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.bolt_outlined),
+          selectedIcon: Icon(Icons.bolt),
+          label: 'Cardio',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.person_outline),
+          selectedIcon: Icon(Icons.person),
+          label: 'Profile',
+        ),
       ],
     ),
   );

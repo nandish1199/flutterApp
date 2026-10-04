@@ -52,7 +52,16 @@ class _MainShellState extends State<MainShell> {
         onOpenProgress: () => _openTab(2),
         onOpenSerum: () => _openTab(3),
         onOpenBreathing: () => _openTab(4),
-        onOpenWeight: () => _openTab(6),
+        onOpenWeight: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => WeightTrackerPage(
+              onNavigate: (index) {
+                Navigator.of(context).pop();
+                _openTab(index);
+              },
+            ),
+          ),
+        ),
         onOpenSleepSounds: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const SleepSoundsPage()),
         ),
@@ -62,7 +71,6 @@ class _MainShellState extends State<MainShell> {
       const SerumTrackerPage(),
       const BreathingExercisePage(),
       const CardioConfigurePage(),
-      const WeightTrackerPage(),
       const ProfilePage(),
     ];
     return Scaffold(
@@ -103,11 +111,6 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.bolt_outlined),
             selectedIcon: Icon(Icons.bolt),
             label: 'Cardio',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.monitor_weight_outlined),
-            selectedIcon: Icon(Icons.monitor_weight),
-            label: 'Weight',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
