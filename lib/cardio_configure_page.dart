@@ -93,7 +93,9 @@ class SavedCardioPlan {
 }
 
 class CardioConfigurePage extends StatefulWidget {
-  const CardioConfigurePage({super.key});
+  const CardioConfigurePage({super.key, this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   State<CardioConfigurePage> createState() => _CardioConfigurePageState();
@@ -550,6 +552,14 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
   String _formatTime(int seconds) =>
       '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
 
+  void _goBack() {
+    if (widget.onBack != null) {
+      widget.onBack!();
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     body: SafeArea(
@@ -575,7 +585,7 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
   Widget _header() => Row(
     children: [
       IconButton(
-        onPressed: () => Navigator.pop(context),
+        onPressed: _goBack,
         icon: const Icon(Icons.arrow_back_rounded, color: AppColors.ink),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(),

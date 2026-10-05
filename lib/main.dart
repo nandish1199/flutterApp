@@ -82,7 +82,7 @@ class _MainShellState extends State<MainShell> {
       ),
       const WorkoutTrackerPage(),
       CalorieTrackerPage(onOpenProfile: () => _openTab(4)),
-      const CardioConfigurePage(),
+      CardioConfigurePage(onBack: () => _openTab(0)),
       const ProfilePage(),
     ];
     return Scaffold(
