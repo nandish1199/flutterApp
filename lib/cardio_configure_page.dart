@@ -114,20 +114,31 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
   String? _editingId;
   String _status = '';
   bool _statusError = false;
-  Timer? _timer;
+
+  int _sessionId = 0;
+  bool _isPaused = false;
   _CardioTimerState? _timerState;
   DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
   @override
   void initState() {
     super.initState();
+    _initTts();
     _load();
+  }
+
+  Future<void> _initTts() async {
+    try {
+      await _tts.awaitSpeakCompletion(true);
+    } catch (_) {}
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
-    _tts.stop();
+    _sessionId++;
+    try {
+      _tts.stop();
+    } catch (_) {}
     for (final controller in [
       _nameController,
       _roundsController,
@@ -139,6 +150,43 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  bool _isValid(int currentSession) =>
+      mounted && _timerState != null && _sessionId == currentSession;
+
+  /// Speaks longer phrases and awaits natural completion before proceeding
+  Future<void> _speakPhrase(String text) async {
+    try {
+      await _tts.awaitSpeakCompletion(true);
+      await _tts
+          .speak(text)
+          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+    } catch (_) {}
+  }
+
+  /// Instantly fires digits to keep countdown cadence strict
+  void _speakDigit(dynamic number) {
+    try {
+      _tts.speak('$number');
+    } catch (_) {}
+  }
+
+  Future<void> _waitDelay(Duration duration, int currentSession) async {
+    int elapsedMs = 0;
+    final targetMs = duration.inMilliseconds;
+    while (elapsedMs < targetMs) {
+      if (!_isValid(currentSession)) return;
+      while (_isPaused) {
+        if (!_isValid(currentSession)) return;
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      final step = (targetMs - elapsedMs) > 100 ? 100 : (targetMs - elapsedMs);
+      await Future.delayed(Duration(milliseconds: step));
+      if (!_isPaused) {
+        elapsedMs += step;
+      }
+    }
   }
 
   Future<void> _load() async {
@@ -190,6 +238,7 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
 
   int _intValue(TextEditingController controller, {int minimum = 0}) =>
       (int.tryParse(controller.text) ?? minimum).clamp(minimum, 9999).toInt();
+
   double _doubleValue(TextEditingController controller) =>
       (double.tryParse(controller.text) ?? 0.1).clamp(0.1, 9999).toDouble();
 
@@ -326,114 +375,178 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
     await _persist();
   }
 
-  Future<void> _speak(String text) async {
-    try {
-      await _tts.speak(text);
-    } catch (_) {}
-  }
-
   void _startSession() {
     if (_plan.isEmpty || _timerState != null) {
       if (_plan.isEmpty) _showStatus('Add at least one cardio first.', true);
       return;
     }
+    _runSession();
+  }
+
+  Future<void> _runSession() async {
+    final currentSession = ++_sessionId;
+    _isPaused = false;
+
+    final firstItem = _plan.first;
     final state = _CardioTimerState(
       itemIndex: 0,
       round: 1,
-      phase: _CardioPhase.work,
-      remaining: _plan.first.workSeconds,
-      total: _plan.first.workSeconds,
-      reps: _plan.first.reps,
-      secondsPerRep: _plan.first.secondsPerRep,
+      phase: _CardioPhase.prepare,
+      remaining: 5,
+      total: 5,
+      reps: firstItem.reps,
+      secondsPerRep: firstItem.secondsPerRep,
+      currentRep: firstItem.reps,
     );
     setState(() => _timerState = state);
-    _speak('Get ready. ${_plan.first.name}');
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
-  }
 
-  void _tick() {
-    final state = _timerState;
-    if (state == null || !mounted) return;
-    setState(() => state.remaining--);
-    if (state.remaining > 0) {
-      if ((state.phase == _CardioPhase.rest ||
-              state.phase == _CardioPhase.transition) &&
-          state.remaining <= 5) {
-        _speak('${state.remaining}');
-      }
-      return;
+    // -------------------------------------------------------------------------
+    // STEP 1: Start with "Start", then 5 - 1sec gap - 4 - 1sec gap - 3 - 2 - 1
+    // -------------------------------------------------------------------------
+    await _speakPhrase('Start');
+    if (!_isValid(currentSession)) return;
+
+    await _waitDelay(const Duration(milliseconds: 250), currentSession);
+    if (!_isValid(currentSession)) return;
+
+    for (int i = 5; i >= 1; i--) {
+      if (!_isValid(currentSession)) return;
+      setState(() {
+        state.remaining = i;
+        state.total = 5;
+      });
+      _speakDigit(i);
+      await _waitDelay(const Duration(seconds: 1), currentSession);
+      if (!_isValid(currentSession)) return;
     }
-    final item = _plan[state.itemIndex];
-    if (state.phase == _CardioPhase.work) {
-      if (state.round < item.rounds && item.restSeconds > 0) {
-        _setTimerPhase(_CardioPhase.rest, item.restSeconds, item.restSeconds);
-        _speak('Rest');
-      } else if (state.round < item.rounds) {
-        state.round++;
-        _startWork(state, item);
-        _speak('${item.name}. Round ${state.round}');
-      } else if (state.itemIndex + 1 < _plan.length &&
-          item.transitionRest > 0) {
-        state.nextIndex = state.itemIndex + 1;
-        _setTimerPhase(
-          _CardioPhase.transition,
-          item.transitionRest,
-          item.transitionRest,
-        );
-        _speak('Rest before ${_plan[state.nextIndex!].name}');
-      } else if (state.itemIndex + 1 < _plan.length) {
-        _nextBlock(state);
-      } else {
-        _finishSession();
+
+    // Run through configured cardio blocks
+    for (int bIdx = 0; bIdx < _plan.length; bIdx++) {
+      state.itemIndex = bIdx;
+      final block = _plan[bIdx];
+
+      for (int round = 1; round <= block.rounds; round++) {
+        state.round = round;
+        state.phase = _CardioPhase.work;
+        state.remaining = block.workSeconds;
+        state.total = block.workSeconds;
+        state.reps = block.reps;
+        state.secondsPerRep = block.secondsPerRep;
+        state.currentRep = block.reps;
+        setState(() {});
+
+        // ---------------------------------------------------------------------
+        // STEP 2: Say the complete cardio name followed by round (e.g. Round 1)
+        // ---------------------------------------------------------------------
+        await _speakPhrase('${block.name}. Round $round');
+        if (!_isValid(currentSession)) return;
+
+        await _waitDelay(const Duration(milliseconds: 300), currentSession);
+        if (!_isValid(currentSession)) return;
+
+        // ---------------------------------------------------------------------
+        // STEP 3: Count down reps from reps down to 1 with (seconds/rep) gap
+        // ---------------------------------------------------------------------
+        final repMs = (block.secondsPerRep * 1000).round();
+        for (int rep = block.reps; rep >= 1; rep--) {
+          if (!_isValid(currentSession)) return;
+          setState(() => state.currentRep = rep);
+          _speakDigit(rep);
+
+          int repElapsed = 0;
+          int lastSecTicked = 0;
+          while (repElapsed < repMs) {
+            if (!_isValid(currentSession)) return;
+            while (_isPaused) {
+              if (!_isValid(currentSession)) return;
+              await Future.delayed(const Duration(milliseconds: 100));
+            }
+            final step = (repMs - repElapsed) > 100
+                ? 100
+                : (repMs - repElapsed);
+            await Future.delayed(Duration(milliseconds: step));
+            if (!_isPaused) {
+              repElapsed += step;
+              final secNow = repElapsed ~/ 1000;
+              if (secNow > lastSecTicked) {
+                lastSecTicked = secNow;
+                if (mounted) {
+                  setState(() {
+                    if (state.remaining > 0) state.remaining--;
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        setState(() => state.remaining = 0);
+
+        // Rest interval between rounds within the current block
+        if (round < block.rounds && block.restSeconds > 0) {
+          state.phase = _CardioPhase.rest;
+          state.remaining = block.restSeconds;
+          state.total = block.restSeconds;
+          setState(() {});
+
+          await _speakPhrase('Rest');
+          if (!_isValid(currentSession)) return;
+
+          for (int sec = block.restSeconds; sec >= 1; sec--) {
+            if (!_isValid(currentSession)) return;
+            setState(() => state.remaining = sec);
+            if (sec <= 5) {
+              _speakDigit(sec);
+            }
+            await _waitDelay(const Duration(seconds: 1), currentSession);
+            if (!_isValid(currentSession)) return;
+          }
+        }
       }
-    } else if (state.phase == _CardioPhase.transition) {
-      _nextBlock(state);
-    } else {
-      state.round++;
-      _startWork(state, item);
-      _speak('${item.name}. Round ${state.round}');
+
+      // Transition rest between different cardio blocks
+      if (bIdx + 1 < _plan.length && block.transitionRest > 0) {
+        state.nextIndex = bIdx + 1;
+        state.phase = _CardioPhase.transition;
+        state.remaining = block.transitionRest;
+        state.total = block.transitionRest;
+        setState(() {});
+
+        await _speakPhrase('Rest before ${_plan[state.nextIndex!].name}');
+        if (!_isValid(currentSession)) return;
+
+        for (int sec = block.transitionRest; sec >= 1; sec--) {
+          if (!_isValid(currentSession)) return;
+          setState(() => state.remaining = sec);
+          if (sec <= 5) {
+            _speakDigit(sec);
+          }
+          await _waitDelay(const Duration(seconds: 1), currentSession);
+          if (!_isValid(currentSession)) return;
+        }
+      }
     }
-  }
 
-  void _startWork(_CardioTimerState state, CardioBlock item) {
-    state.phase = _CardioPhase.work;
-    state.remaining = item.workSeconds;
-    state.total = item.workSeconds;
-    state.reps = item.reps;
-    state.secondsPerRep = item.secondsPerRep;
-  }
-
-  void _setTimerPhase(_CardioPhase phase, int remaining, int total) {
-    setState(() {
-      _timerState!.phase = phase;
-      _timerState!.remaining = remaining;
-      _timerState!.total = total;
-    });
-  }
-
-  void _nextBlock(_CardioTimerState state) {
-    state.itemIndex = state.nextIndex ?? state.itemIndex + 1;
-    state.nextIndex = null;
-    state.round = 1;
-    final next = _plan[state.itemIndex];
-    _startWork(state, next);
-    _speak('Change. ${next.name}');
+    _finishSession(completed: true);
   }
 
   Future<void> _finishSession({bool completed = true}) async {
-    _timer?.cancel();
-    _timer = null;
-    await _tts.stop();
+    _sessionId++;
+    _isPaused = false;
+    try {
+      await _tts.stop();
+    } catch (_) {}
     if (completed) {
       setState(() => _completedDays.add(_dayKey(DateTime.now())));
       await _persist();
-      await _speak('Session complete. Great work.');
+      await _speakPhrase('Session complete. Great work.');
     }
     if (mounted) setState(() => _timerState = null);
   }
 
   String _dayKey(DateTime date) =>
       '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
   String _formatTime(int seconds) =>
       '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
 
@@ -463,7 +576,6 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
           color: AppColors.ink,
           borderRadius: BorderRadius.circular(16),
         ),
-        // Changed icon from bolt_rounded to directions_run_rounded
         child: const Icon(
           Icons.directions_run_rounded,
           color: AppColors.lime,
@@ -506,6 +618,7 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
       children: children,
     ),
   );
+
   Widget _sectionTitle(String text) => Text(
     text,
     style: const TextStyle(
@@ -515,6 +628,7 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
       letterSpacing: 1.1,
     ),
   );
+
   InputDecoration _decoration(String hint) => InputDecoration(
     labelText: hint,
     filled: true,
@@ -817,16 +931,22 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
   Widget _timerCard() {
     final state = _timerState!;
     final item = _plan[state.itemIndex];
-    final title = state.phase == _CardioPhase.work
+    final title = state.phase == _CardioPhase.prepare
+        ? 'Get ready'
+        : state.phase == _CardioPhase.work
         ? item.name
         : state.phase == _CardioPhase.rest
         ? 'Recover'
         : 'Between cardio';
-    final phase = state.phase == _CardioPhase.work
-        ? 'ROUND ${state.round} OF ${item.rounds}'
+
+    final phase = state.phase == _CardioPhase.prepare
+        ? 'GET READY'
+        : state.phase == _CardioPhase.work
+        ? 'ROUND ${state.round} OF ${item.rounds}  •  REP ${state.currentRep ?? state.reps} OF ${item.reps}'
         : state.phase == _CardioPhase.rest
         ? 'REST'
         : 'TRANSITION';
+
     return _card([
       Center(
         child: Text(
@@ -860,6 +980,8 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
             shape: BoxShape.circle,
             color: state.phase == _CardioPhase.work
                 ? AppColors.lime
+                : state.phase == _CardioPhase.prepare
+                ? AppColors.mint
                 : AppColors.peach,
             boxShadow: [
               BoxShadow(
@@ -871,7 +993,9 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
           ),
           child: Center(
             child: Text(
-              _formatTime(state.remaining),
+              state.phase == _CardioPhase.prepare
+                  ? '${state.remaining}'
+                  : _formatTime(state.remaining),
               style: const TextStyle(
                 color: AppColors.ink,
                 fontSize: 28,
@@ -894,21 +1018,17 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
           Expanded(
             child: OutlinedButton.icon(
               onPressed: () {
-                if (_timer == null) {
-                  _timer = Timer.periodic(
-                    const Duration(seconds: 1),
-                    (_) => _tick(),
-                  );
-                } else {
-                  _timer?.cancel();
-                  _timer = null;
-                }
-                setState(() {});
+                setState(() {
+                  _isPaused = !_isPaused;
+                  if (_isPaused) {
+                    _tts.stop();
+                  }
+                });
               },
               icon: Icon(
-                _timer == null ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                _isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
               ),
-              label: Text(_timer == null ? 'Resume' : 'Pause'),
+              label: Text(_isPaused ? 'Resume' : 'Pause'),
             ),
           ),
           const SizedBox(width: 8),
@@ -1038,6 +1158,7 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
     'November',
     'December',
   ][month - 1];
+
   Widget _calendarDay(int day) {
     final date = DateTime(_calendarMonth.year, _calendarMonth.month, day);
     final complete = _completedDays.contains(_dayKey(date));
@@ -1068,7 +1189,6 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
             SizedBox(
               height: 11,
               child: complete
-                  // Changed icon from favorite_rounded to directions_run_rounded
                   ? const Icon(
                       Icons.directions_run_rounded,
                       size: 10,
@@ -1083,7 +1203,7 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
   }
 }
 
-enum _CardioPhase { work, rest, transition }
+enum _CardioPhase { prepare, work, rest, transition }
 
 class _CardioTimerState {
   _CardioTimerState({
@@ -1094,6 +1214,8 @@ class _CardioTimerState {
     required this.total,
     required this.reps,
     required this.secondsPerRep,
+    this.currentRep,
+    this.nextIndex,
   });
 
   int itemIndex;
@@ -1103,5 +1225,6 @@ class _CardioTimerState {
   int total;
   int reps;
   double secondsPerRep;
+  int? currentRep;
   int? nextIndex;
 }

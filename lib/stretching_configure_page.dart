@@ -108,20 +108,31 @@ class _StretchingConfigurePageState extends State<StretchingConfigurePage> {
   String? _editingId;
   String _status = '';
   bool _statusError = false;
-  Timer? _timer;
+
+  int _sessionId = 0;
+  bool _isPaused = false;
   _StretchTimerState? _timerState;
   DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
   @override
   void initState() {
     super.initState();
+    _initTts();
     _load();
+  }
+
+  Future<void> _initTts() async {
+    try {
+      await _tts.awaitSpeakCompletion(true);
+    } catch (_) {}
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
-    _tts.stop();
+    _sessionId++;
+    try {
+      _tts.stop();
+    } catch (_) {}
     for (final controller in [
       _nameController,
       _setsController,
@@ -132,6 +143,43 @@ class _StretchingConfigurePageState extends State<StretchingConfigurePage> {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  bool _isValid(int currentSession) =>
+      mounted && _timerState != null && _sessionId == currentSession;
+
+  /// Speaks longer phrases and awaits natural completion before proceeding
+  Future<void> _speakPhrase(String text) async {
+    try {
+      await _tts.awaitSpeakCompletion(true);
+      await _tts
+          .speak(text)
+          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+    } catch (_) {}
+  }
+
+  /// Instantly fires digits to keep countdown cadence exact
+  void _speakDigit(dynamic number) {
+    try {
+      _tts.speak('$number');
+    } catch (_) {}
+  }
+
+  Future<void> _waitDelay(Duration duration, int currentSession) async {
+    int elapsedMs = 0;
+    final targetMs = duration.inMilliseconds;
+    while (elapsedMs < targetMs) {
+      if (!_isValid(currentSession)) return;
+      while (_isPaused) {
+        if (!_isValid(currentSession)) return;
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      final step = (targetMs - elapsedMs) > 100 ? 100 : (targetMs - elapsedMs);
+      await Future.delayed(Duration(milliseconds: step));
+      if (!_isPaused) {
+        elapsedMs += step;
+      }
+    }
   }
 
   Future<void> _load() async {
@@ -314,109 +362,140 @@ class _StretchingConfigurePageState extends State<StretchingConfigurePage> {
     await _persist();
   }
 
-  Future<void> _speak(String text) async {
-    try {
-      await _tts.speak(text);
-    } catch (_) {}
-  }
-
   void _startSession() {
     if (_plan.isEmpty || _timerState != null) {
       if (_plan.isEmpty) _showStatus('Add at least one stretch first.', true);
       return;
     }
+    _runSession();
+  }
+
+  Future<void> _runSession() async {
+    final currentSession = ++_sessionId;
+    _isPaused = false;
+
+    final firstItem = _plan.first;
     final state = _StretchTimerState(
       itemIndex: 0,
       setNumber: 1,
-      phase: _StretchPhase.work,
-      remaining: _plan.first.duration,
-      total: _plan.first.duration,
+      phase: _StretchPhase.prepare,
+      remaining: 5,
+      total: 5,
     );
     setState(() => _timerState = state);
-    _speak('Get ready. ${_plan.first.name}, Set 1.');
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
-  }
 
-  void _tick() {
-    final state = _timerState;
-    if (state == null || !mounted) return;
-    setState(() => state.remaining--);
-    final item = _plan[state.itemIndex];
+    // -------------------------------------------------------------------------
+    // STEP 1: "Start", then 5 - 1sec gap - 4 - 1sec gap - 3 - 2 - 1
+    // -------------------------------------------------------------------------
+    await _speakPhrase('Start');
+    if (!_isValid(currentSession)) return;
 
-    if (state.phase == _StretchPhase.rest ||
-        state.phase == _StretchPhase.transition) {
-      if (state.remaining > 0 && state.remaining <= 5)
-        _speak('${state.remaining}');
-    } else if (state.phase == _StretchPhase.work) {
-      if (state.remaining == item.duration ~/ 2) _speak('Halfway there.');
-      if (state.remaining > 0 && state.remaining <= 3)
-        _speak('${state.remaining}');
+    await _waitDelay(const Duration(milliseconds: 250), currentSession);
+    if (!_isValid(currentSession)) return;
+
+    for (int i = 5; i >= 1; i--) {
+      if (!_isValid(currentSession)) return;
+      setState(() {
+        state.remaining = i;
+        state.total = 5;
+      });
+      _speakDigit(i);
+      await _waitDelay(const Duration(seconds: 1), currentSession);
+      if (!_isValid(currentSession)) return;
     }
 
-    if (state.remaining > 0) return;
+    // Run through configured stretch blocks
+    for (int bIdx = 0; bIdx < _plan.length; bIdx++) {
+      state.itemIndex = bIdx;
+      final block = _plan[bIdx];
 
-    if (state.phase == _StretchPhase.work) {
-      if (state.setNumber < item.sets && item.restSeconds > 0) {
-        _setTimerPhase(_StretchPhase.rest, item.restSeconds, item.restSeconds);
-        _speak('Rest');
-      } else if (state.setNumber < item.sets) {
-        state.setNumber++;
-        _startWork(state, item);
-        _speak('${item.name}. Set ${state.setNumber}');
-      } else if (state.itemIndex + 1 < _plan.length &&
-          item.transitionRest > 0) {
-        state.nextIndex = state.itemIndex + 1;
-        _setTimerPhase(
-          _StretchPhase.transition,
-          item.transitionRest,
-          item.transitionRest,
-        );
-        _speak('Rest before ${_plan[state.nextIndex!].name}');
-      } else if (state.itemIndex + 1 < _plan.length) {
-        _nextBlock(state);
-      } else {
-        _finishSession();
+      for (int set = 1; set <= block.sets; set++) {
+        state.setNumber = set;
+        state.phase = _StretchPhase.work;
+        state.remaining = block.duration;
+        state.total = block.duration;
+        setState(() {});
+
+        // ---------------------------------------------------------------------
+        // STEP 2: Say complete stretch name followed by set (e.g. Set 1)
+        // ---------------------------------------------------------------------
+        await _speakPhrase('${block.name}. Set $set');
+        if (!_isValid(currentSession)) return;
+
+        await _waitDelay(const Duration(milliseconds: 300), currentSession);
+        if (!_isValid(currentSession)) return;
+
+        // ---------------------------------------------------------------------
+        // STEP 3: Count down the hold time (each second down to 1)
+        // ---------------------------------------------------------------------
+        for (int sec = block.duration; sec >= 1; sec--) {
+          if (!_isValid(currentSession)) return;
+          setState(() => state.remaining = sec);
+          _speakDigit(sec);
+          await _waitDelay(const Duration(seconds: 1), currentSession);
+          if (!_isValid(currentSession)) return;
+        }
+
+        setState(() => state.remaining = 0);
+
+        // Rest interval between sets within the same stretch
+        if (set < block.sets && block.restSeconds > 0) {
+          state.phase = _StretchPhase.rest;
+          state.remaining = block.restSeconds;
+          state.total = block.restSeconds;
+          setState(() {});
+
+          await _speakPhrase('Rest');
+          if (!_isValid(currentSession)) return;
+
+          for (int sec = block.restSeconds; sec >= 1; sec--) {
+            if (!_isValid(currentSession)) return;
+            setState(() => state.remaining = sec);
+            if (sec <= 5) {
+              _speakDigit(sec);
+            }
+            await _waitDelay(const Duration(seconds: 1), currentSession);
+            if (!_isValid(currentSession)) return;
+          }
+        }
       }
-    } else if (state.phase == _StretchPhase.transition) {
-      _nextBlock(state);
-    } else {
-      state.setNumber++;
-      _startWork(state, item);
-      _speak('${item.name}. Set ${state.setNumber}');
+
+      // Transition rest between different stretch blocks
+      if (bIdx + 1 < _plan.length && block.transitionRest > 0) {
+        state.nextIndex = bIdx + 1;
+        state.phase = _StretchPhase.transition;
+        state.remaining = block.transitionRest;
+        state.total = block.transitionRest;
+        setState(() {});
+
+        await _speakPhrase('Rest before ${_plan[state.nextIndex!].name}');
+        if (!_isValid(currentSession)) return;
+
+        for (int sec = block.transitionRest; sec >= 1; sec--) {
+          if (!_isValid(currentSession)) return;
+          setState(() => state.remaining = sec);
+          if (sec <= 5) {
+            _speakDigit(sec);
+          }
+          await _waitDelay(const Duration(seconds: 1), currentSession);
+          if (!_isValid(currentSession)) return;
+        }
+      }
     }
-  }
 
-  void _startWork(_StretchTimerState state, StretchBlock item) {
-    state.phase = _StretchPhase.work;
-    state.remaining = item.duration;
-    state.total = item.duration;
-  }
-
-  void _setTimerPhase(_StretchPhase phase, int remaining, int total) {
-    setState(() {
-      _timerState!.phase = phase;
-      _timerState!.remaining = remaining;
-      _timerState!.total = total;
-    });
-  }
-
-  void _nextBlock(_StretchTimerState state) {
-    state.itemIndex = state.nextIndex ?? state.itemIndex + 1;
-    state.nextIndex = null;
-    state.setNumber = 1;
-    final next = _plan[state.itemIndex];
-    _startWork(state, next);
-    _speak('Change. ${next.name}');
+    _finishSession(completed: true);
   }
 
   Future<void> _finishSession({bool completed = true}) async {
-    _timer?.cancel();
-    _timer = null;
-    await _tts.stop();
+    _sessionId++;
+    _isPaused = false;
+    try {
+      await _tts.stop();
+    } catch (_) {}
     if (completed) {
       setState(() => _completedDays.add(_dayKey(DateTime.now())));
       await _persist();
-      await _speak('Session complete. Great work.');
+      await _speakPhrase('Session complete. Great work.');
     }
     if (mounted) setState(() => _timerState = null);
   }
@@ -506,6 +585,7 @@ class _StretchingConfigurePageState extends State<StretchingConfigurePage> {
       children: children,
     ),
   );
+
   Widget _sectionTitle(String text) => Text(
     text,
     style: const TextStyle(
@@ -515,6 +595,7 @@ class _StretchingConfigurePageState extends State<StretchingConfigurePage> {
       letterSpacing: 1.1,
     ),
   );
+
   InputDecoration _decoration(String hint) => InputDecoration(
     labelText: hint,
     filled: true,
@@ -810,16 +891,22 @@ class _StretchingConfigurePageState extends State<StretchingConfigurePage> {
   Widget _timerCard() {
     final state = _timerState!;
     final item = _plan[state.itemIndex];
-    final title = state.phase == _StretchPhase.work
+    final title = state.phase == _StretchPhase.prepare
+        ? 'Get ready'
+        : state.phase == _StretchPhase.work
         ? item.name
         : state.phase == _StretchPhase.rest
         ? 'Recover'
         : 'Between stretches';
-    final phase = state.phase == _StretchPhase.work
+
+    final phase = state.phase == _StretchPhase.prepare
+        ? 'GET READY'
+        : state.phase == _StretchPhase.work
         ? 'SET ${state.setNumber} OF ${item.sets}'
         : state.phase == _StretchPhase.rest
         ? 'REST'
         : 'TRANSITION';
+
     return _card([
       Center(
         child: Text(
@@ -853,12 +940,16 @@ class _StretchingConfigurePageState extends State<StretchingConfigurePage> {
             shape: BoxShape.circle,
             color: state.phase == _StretchPhase.work
                 ? AppColors.mint
+                : state.phase == _StretchPhase.prepare
+                ? AppColors.lime
                 : AppColors.peach,
             boxShadow: [
               BoxShadow(
                 color:
                     (state.phase == _StretchPhase.work
                             ? AppColors.mint
+                            : state.phase == _StretchPhase.prepare
+                            ? AppColors.lime
                             : AppColors.peach)
                         .withAlpha(100),
                 blurRadius: 24,
@@ -868,7 +959,9 @@ class _StretchingConfigurePageState extends State<StretchingConfigurePage> {
           ),
           child: Center(
             child: Text(
-              _formatTime(state.remaining),
+              state.phase == _StretchPhase.prepare
+                  ? '${state.remaining}'
+                  : _formatTime(state.remaining),
               style: const TextStyle(
                 color: AppColors.ink,
                 fontSize: 28,
@@ -891,21 +984,17 @@ class _StretchingConfigurePageState extends State<StretchingConfigurePage> {
           Expanded(
             child: OutlinedButton.icon(
               onPressed: () {
-                if (_timer == null) {
-                  _timer = Timer.periodic(
-                    const Duration(seconds: 1),
-                    (_) => _tick(),
-                  );
-                } else {
-                  _timer?.cancel();
-                  _timer = null;
-                }
-                setState(() {});
+                setState(() {
+                  _isPaused = !_isPaused;
+                  if (_isPaused) {
+                    _tts.stop();
+                  }
+                });
               },
               icon: Icon(
-                _timer == null ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                _isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
               ),
-              label: Text(_timer == null ? 'Resume' : 'Pause'),
+              label: Text(_isPaused ? 'Resume' : 'Pause'),
             ),
           ),
           const SizedBox(width: 8),
@@ -1035,6 +1124,7 @@ class _StretchingConfigurePageState extends State<StretchingConfigurePage> {
     'November',
     'December',
   ][month - 1];
+
   Widget _calendarDay(int day) {
     final date = DateTime(_calendarMonth.year, _calendarMonth.month, day);
     final complete = _completedDays.contains(_dayKey(date));
@@ -1079,7 +1169,7 @@ class _StretchingConfigurePageState extends State<StretchingConfigurePage> {
   }
 }
 
-enum _StretchPhase { work, rest, transition }
+enum _StretchPhase { prepare, work, rest, transition }
 
 class _StretchTimerState {
   _StretchTimerState({
@@ -1088,6 +1178,7 @@ class _StretchTimerState {
     required this.phase,
     required this.remaining,
     required this.total,
+    this.nextIndex,
   });
 
   int itemIndex;
