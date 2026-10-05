@@ -1,3 +1,5 @@
+// lib/main.dart
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -14,8 +16,14 @@ import 'sleep_sounds_page.dart';
 import 'stretching_configure_page.dart';
 import 'workout_tracker_page.dart';
 import 'weight_tracker_page.dart';
+import 'notification_service.dart';
+import 'water_intake_reminder_page.dart';
 
-void main() => runApp(const ElateFitApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.init();
+  runApp(const ElateFitApp());
+}
 
 class ElateFitApp extends StatelessWidget {
   const ElateFitApp({super.key});
@@ -125,7 +133,7 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({
     super.key,
     this.activityRefreshToken = 0,
@@ -157,6 +165,42 @@ class HomePage extends StatelessWidget {
   static const mint = AppColors.mint;
   static const peach = AppColors.peach;
   static const lavender = AppColors.lavender;
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  bool _waterReminderEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWaterReminderState();
+  }
+
+  Future<void> _loadWaterReminderState() async {
+    final enabled = await WaterReminderStorage.isEnabled();
+    if (mounted) {
+      setState(() => _waterReminderEnabled = enabled);
+    }
+  }
+
+  Future<void> _toggleWaterReminder(bool value) async {
+    await WaterReminderStorage.setEnabled(value);
+    setState(() => _waterReminderEnabled = value);
+    await WaterReminderStorage.syncNotifications();
+  }
+
+  void _openWaterReminderPage() {
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute<void>(
+            builder: (_) => const WaterIntakeReminderPage(),
+          ),
+        )
+        .then((_) => _loadWaterReminderState());
+  }
 
   Future<Map<String, dynamic>> _fetchSnapshotData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -244,9 +288,11 @@ class HomePage extends StatelessWidget {
                 const SizedBox(height: 14),
                 _features(),
                 const SizedBox(height: 26),
-                _HomeActivityCalendar(key: ValueKey(activityRefreshToken)),
+                _HomeActivityCalendar(
+                  key: ValueKey(widget.activityRefreshToken),
+                ),
                 const SizedBox(height: 26),
-                _heading('Today\'s rhythm', 'Edit plan'),
+                _heading('Today\'s rhythm', 'Reminders'),
                 const SizedBox(height: 14),
                 _plan(),
               ]),
@@ -263,10 +309,10 @@ class HomePage extends StatelessWidget {
         width: 46,
         height: 46,
         decoration: BoxDecoration(
-          color: ink,
+          color: HomePage.ink,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Icon(Icons.bolt_rounded, color: lime, size: 26),
+        child: const Icon(Icons.bolt_rounded, color: HomePage.lime, size: 26),
       ),
       const SizedBox(width: 12),
       const Expanded(
@@ -278,24 +324,31 @@ class HomePage extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: ink,
+                color: HomePage.ink,
               ),
             ),
             SizedBox(height: 3),
             Text(
               'Let’s make today feel good.',
-              style: TextStyle(fontSize: 13, color: muted),
+              style: TextStyle(fontSize: 13, color: HomePage.muted),
             ),
           ],
         ),
       ),
       IconButton(
-        onPressed: null,
-        style: const ButtonStyle(
-          backgroundColor: WidgetStatePropertyAll(Colors.white),
-          foregroundColor: WidgetStatePropertyAll(ink),
+        onPressed: _openWaterReminderPage,
+        style: ButtonStyle(
+          backgroundColor: WidgetStatePropertyAll(
+            _waterReminderEnabled ? HomePage.lime : Colors.white,
+          ),
+          foregroundColor: const WidgetStatePropertyAll(HomePage.ink),
         ),
-        icon: const Icon(Icons.notifications_none_rounded),
+        tooltip: 'Water Intake Reminders',
+        icon: Icon(
+          _waterReminderEnabled
+              ? Icons.notifications_active_rounded
+              : Icons.notifications_off_outlined,
+        ),
       ),
     ],
   );
@@ -336,7 +389,7 @@ class HomePage extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: ink,
+          color: HomePage.ink,
           borderRadius: BorderRadius.circular(28),
         ),
         child: Column(
@@ -348,7 +401,7 @@ class HomePage extends StatelessWidget {
                 const Text(
                   'DAILY SNAPSHOT',
                   style: TextStyle(
-                    color: lime,
+                    color: HomePage.lime,
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.2,
@@ -465,13 +518,13 @@ class HomePage extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: isCompleted
-                    ? lime.withAlpha(50)
+                    ? HomePage.lime.withAlpha(50)
                     : Colors.white.withAlpha(15),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
-                color: isCompleted ? lime : Colors.white54,
+                color: isCompleted ? HomePage.lime : Colors.white54,
                 size: 26,
               ),
             ),
@@ -479,10 +532,10 @@ class HomePage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(2),
                 decoration: const BoxDecoration(
-                  color: lime,
+                  color: HomePage.lime,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check, color: ink, size: 12),
+                child: const Icon(Icons.check, color: HomePage.ink, size: 12),
               ),
           ],
         ),
@@ -505,7 +558,7 @@ class HomePage extends StatelessWidget {
       Text(
         title,
         style: const TextStyle(
-          color: ink,
+          color: HomePage.ink,
           fontSize: 18,
           fontWeight: FontWeight.w800,
         ),
@@ -513,7 +566,7 @@ class HomePage extends StatelessWidget {
       Text(
         action,
         style: const TextStyle(
-          color: muted,
+          color: HomePage.muted,
           fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
@@ -522,26 +575,56 @@ class HomePage extends StatelessWidget {
   );
 
   Widget _features() {
-    const items = [
-      _Feature('Lift', 'Workout tracker', Icons.fitness_center, peach),
-      _Feature('Fuel', 'Calorie tracker', Icons.ramen_dining, lime),
-      _Feature('Meds', 'Medicine tracker', Icons.medication_rounded, mint),
-      _Feature('Serum', 'Serum tracker', Icons.auto_awesome_rounded, mint),
-      _Feature('Restore', 'Sleep sounds', Icons.nightlight_round, lavender),
-      _Feature('Breathe', 'Breathing exercise', Icons.air, mint),
-      _Feature(
+    final items = [
+      const _Feature(
+        'Lift',
+        'Workout tracker',
+        Icons.fitness_center,
+        HomePage.peach,
+      ),
+      const _Feature(
+        'Fuel',
+        'Calorie tracker',
+        Icons.ramen_dining,
+        HomePage.lime,
+      ),
+      const _Feature(
+        'Meds',
+        'Medicine tracker',
+        Icons.medication_rounded,
+        HomePage.mint,
+      ),
+      const _Feature(
+        'Serum',
+        'Serum tracker',
+        Icons.auto_awesome_rounded,
+        HomePage.mint,
+      ),
+      const _Feature(
+        'Restore',
+        'Sleep sounds',
+        Icons.nightlight_round,
+        HomePage.lavender,
+      ),
+      const _Feature('Breathe', 'Breathing exercise', Icons.air, HomePage.mint),
+      const _Feature(
         'Stretch',
         'Stretching routine',
         Icons.accessibility_new_rounded,
-        lavender,
+        HomePage.lavender,
       ),
-      _Feature(
+      const _Feature(
         'Balance',
         'Weight tracker',
         Icons.monitor_weight_rounded,
-        peach,
+        HomePage.peach,
       ),
-      _Feature('Cardio', 'Cardio builder', Icons.directions_run_rounded, lime),
+      const _Feature(
+        'Cardio',
+        'Cardio builder',
+        Icons.directions_run_rounded,
+        HomePage.lime,
+      ),
     ];
     return GridView.builder(
       shrinkWrap: true,
@@ -561,23 +644,23 @@ class HomePage extends StatelessWidget {
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
             onTap: item.title == 'Fuel'
-                ? onOpenProgress
+                ? widget.onOpenProgress
                 : item.title == 'Restore'
-                ? onOpenSleepSounds
+                ? widget.onOpenSleepSounds
                 : item.title == 'Lift'
-                ? onOpenWorkout
+                ? widget.onOpenWorkout
                 : item.title == 'Serum'
-                ? onOpenSerum
+                ? widget.onOpenSerum
                 : item.title == 'Meds'
-                ? onOpenMedicine
+                ? widget.onOpenMedicine
                 : item.title == 'Breathe'
-                ? onOpenBreathing
+                ? widget.onOpenBreathing
                 : item.title == 'Stretch'
-                ? onOpenStretching
+                ? widget.onOpenStretching
                 : item.title == 'Balance'
-                ? onOpenWeight
+                ? widget.onOpenWeight
                 : item.title == 'Cardio'
-                ? onOpenCardio
+                ? widget.onOpenCardio
                 : null,
             child: Padding(
               padding: const EdgeInsets.all(15),
@@ -585,14 +668,14 @@ class HomePage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(item.icon, color: ink, size: 25),
+                  Icon(item.icon, color: HomePage.ink, size: 25),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         item.title,
                         style: const TextStyle(
-                          color: ink,
+                          color: HomePage.ink,
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
                         ),
@@ -600,7 +683,10 @@ class HomePage extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         item.subtitle,
-                        style: const TextStyle(color: muted, fontSize: 11),
+                        style: const TextStyle(
+                          color: HomePage.muted,
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
@@ -613,6 +699,7 @@ class HomePage extends StatelessWidget {
     );
   }
 
+  // Acceptance Criterion 4: Water intake reminder widget with toggle button beside it
   Widget _plan() => Container(
     padding: const EdgeInsets.all(17),
     decoration: BoxDecoration(
@@ -620,30 +707,84 @@ class HomePage extends StatelessWidget {
       borderRadius: BorderRadius.circular(22),
       border: Border.all(color: const Color(0xFFE9EEE9)),
     ),
-    child: const Column(
+    child: Column(
       children: [
-        _PlanItem(
+        const _PlanItem(
           '07:30',
           'Morning stretch',
           '5 min · Mobility',
           Icons.accessibility_new_rounded,
-          peach,
+          HomePage.peach,
         ),
-        Divider(height: 26, color: Color(0xFFEFF2EF)),
-        _PlanItem(
-          '12:30',
-          'Hydration check-in',
-          '2 glasses · Daily goal',
-          Icons.water_drop_rounded,
-          mint,
+        const Divider(height: 26, color: Color(0xFFEFF2EF)),
+        // Water intake reminder widget with inline toggle button
+        InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: _openWaterReminderPage,
+          child: Row(
+            children: [
+              const SizedBox(
+                width: 44,
+                child: Text(
+                  'Daily',
+                  style: TextStyle(
+                    color: Color(0xFF87938C),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: HomePage.mint,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.water_drop_rounded,
+                  color: HomePage.ink,
+                  size: 19,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Water intake reminder',
+                      style: TextStyle(
+                        color: HomePage.ink,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'Stay hydrated throughout the day',
+                      style: TextStyle(color: Color(0xFF87938C), fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              // Inline Toggle Button
+              Switch.adaptive(
+                value: _waterReminderEnabled,
+                activeColor: HomePage.lime,
+                activeTrackColor: HomePage.ink,
+                onChanged: _toggleWaterReminder,
+              ),
+            ],
+          ),
         ),
-        Divider(height: 26, color: Color(0xFFEFF2EF)),
-        _PlanItem(
+        const Divider(height: 26, color: Color(0xFFEFF2EF)),
+        const _PlanItem(
           '21:30',
           'Wind down',
           'Sleep sounds · 20 min',
           Icons.spa_rounded,
-          lavender,
+          HomePage.lavender,
         ),
       ],
     ),
@@ -911,7 +1052,7 @@ class _CalendarWeekday extends StatelessWidget {
     child: Center(
       child: Text(
         label,
-        style: TextStyle(
+        style: const TextStyle(
           color: HomePage.muted,
           fontSize: 10,
           fontWeight: FontWeight.w800,
