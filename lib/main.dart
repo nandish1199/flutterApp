@@ -7,10 +7,11 @@ import 'app_colors.dart';
 import 'breathing_exercise_page.dart';
 import 'cardio_configure_page.dart';
 import 'calorie_tracker_page.dart';
+import 'medicine_intake_page.dart';
 import 'profile_page.dart';
 import 'serum_tracker_page.dart';
 import 'sleep_sounds_page.dart';
-import 'stretching_configure_page.dart'; // Added Import
+import 'stretching_configure_page.dart';
 import 'workout_tracker_page.dart';
 import 'weight_tracker_page.dart';
 
@@ -57,7 +58,7 @@ class _MainShellState extends State<MainShell> {
         onOpenProgress: () => _openTab(2),
         onOpenSerum: () => _openTab(3),
         onOpenBreathing: () => _openTab(4),
-        onOpenCardio: () => _openTab(5), // Added route for the new widget
+        onOpenCardio: () => _openTab(5),
         onOpenWeight: () => Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => WeightTrackerPage(
@@ -75,6 +76,9 @@ class _MainShellState extends State<MainShell> {
           MaterialPageRoute<void>(
             builder: (_) => const StretchingConfigurePage(),
           ),
+        ),
+        onOpenMedicine: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const MedicineIntakePage()),
         ),
       ),
       const WorkoutTrackerPage(),
@@ -119,7 +123,6 @@ class _MainShellState extends State<MainShell> {
             label: 'Breathe',
           ),
           NavigationDestination(
-            // Changed from bolt_outlined / bolt
             icon: Icon(Icons.directions_run_outlined),
             selectedIcon: Icon(Icons.directions_run),
             label: 'Cardio',
@@ -146,7 +149,8 @@ class HomePage extends StatelessWidget {
     this.onOpenWeight,
     this.onOpenSleepSounds,
     this.onOpenStretching,
-    this.onOpenCardio, // Added property
+    this.onOpenCardio,
+    this.onOpenMedicine,
   });
 
   final VoidCallback? onOpenWorkout;
@@ -157,7 +161,8 @@ class HomePage extends StatelessWidget {
   final VoidCallback? onOpenWeight;
   final VoidCallback? onOpenSleepSounds;
   final VoidCallback? onOpenStretching;
-  final VoidCallback? onOpenCardio; // Added property
+  final VoidCallback? onOpenCardio;
+  final VoidCallback? onOpenMedicine;
 
   static const ink = AppColors.ink;
   static const muted = AppColors.muted;
@@ -220,7 +225,6 @@ class HomePage extends StatelessWidget {
         prefs.getStringList('elateFitStretchCompletedDays') ?? [];
     if (stretchDays.contains(todayStr)) stretchDone = true;
 
-    // Added Breathing Check
     bool breatheDone = false;
     final breatheDays =
         prefs.getStringList('elateFitBreatheCompletedDays') ?? [];
@@ -232,7 +236,7 @@ class HomePage extends StatelessWidget {
       'workoutDone': workoutDone,
       'cardioDone': cardioDone,
       'stretchDone': stretchDone,
-      'breatheDone': breatheDone, // Added to return map
+      'breatheDone': breatheDone,
     };
   }
 
@@ -320,7 +324,7 @@ class HomePage extends StatelessWidget {
             'workoutDone': false,
             'cardioDone': false,
             'stretchDone': false,
-            'breatheDone': false, // Added default fallback
+            'breatheDone': false,
           };
 
       final now = DateTime.now();
@@ -455,11 +459,7 @@ class HomePage extends StatelessWidget {
                   data['stretchDone'],
                   'Stretch',
                 ),
-                _taskIcon(
-                  Icons.air_rounded,
-                  data['breatheDone'],
-                  'Breathe',
-                ), // Added new Breathe icon
+                _taskIcon(Icons.air_rounded, data['breatheDone'], 'Breathe'),
               ],
             ),
           ],
@@ -538,8 +538,9 @@ class HomePage extends StatelessWidget {
     const items = [
       _Feature('Lift', 'Workout tracker', Icons.fitness_center, peach),
       _Feature('Fuel', 'Calorie tracker', Icons.ramen_dining, lime),
+      _Feature('Meds', 'Medicine tracker', Icons.medication_rounded, mint),
+      _Feature('Serum', 'Serum tracker', Icons.auto_awesome_rounded, mint),
       _Feature('Restore', 'Sleep sounds', Icons.nightlight_round, lavender),
-      _Feature('Care', 'Medicine intake', Icons.medication_rounded, mint),
       _Feature('Breathe', 'Breathing exercise', Icons.air, mint),
       _Feature(
         'Stretch',
@@ -553,7 +554,6 @@ class HomePage extends StatelessWidget {
         Icons.monitor_weight_rounded,
         peach,
       ),
-      // Added Cardio block to the grid
       _Feature('Cardio', 'Cardio builder', Icons.directions_run_rounded, lime),
     ];
     return GridView.builder(
@@ -579,16 +579,17 @@ class HomePage extends StatelessWidget {
                 ? onOpenSleepSounds
                 : item.title == 'Lift'
                 ? onOpenWorkout
-                : item.title == 'Care'
+                : item.title == 'Serum'
                 ? onOpenSerum
+                : item.title == 'Meds'
+                ? onOpenMedicine
                 : item.title == 'Breathe'
                 ? onOpenBreathing
                 : item.title == 'Stretch'
                 ? onOpenStretching
                 : item.title == 'Balance'
                 ? onOpenWeight
-                : item.title ==
-                      'Cardio' // Mapped Cardio routing
+                : item.title == 'Cardio'
                 ? onOpenCardio
                 : null,
             child: Padding(
