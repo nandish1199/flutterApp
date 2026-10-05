@@ -23,7 +23,6 @@ class WaterReminderItem {
     required this.customMessage,
   });
 
-  /// Formatted string representing the selected days (e.g. "Every day" or "Mon, Wed, Fri")
   String get day {
     if (days.length >= 7 || days.contains('Every day')) return 'Every day';
     const shortMap = {
@@ -140,7 +139,6 @@ class WaterReminderStorage {
     final enabled = await isEnabled();
     final reminders = await loadReminders();
 
-    // Cancel all previously scheduled water alerts
     await NotificationService.cancelAll();
 
     if (!enabled) return;
@@ -219,7 +217,12 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _initPermissionsAndLoad();
+  }
+
+  Future<void> _initPermissionsAndLoad() async {
+    await NotificationService.requestPermissions();
+    await _loadData();
   }
 
   @override
@@ -387,7 +390,6 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
     }
 
     final text = _customTextController.text.trim();
-    // Maintain Monday-Sunday chronological order
     final sortedDays = _daysList
         .where((d) => _selectedDays.contains(d))
         .toList();
@@ -533,7 +535,6 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
           ),
           const SizedBox(height: 18),
 
-          // 1. Dropdown menu to select multiple days in a week
           const Text(
             'SELECT DAYS',
             style: TextStyle(
@@ -579,7 +580,6 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
           ),
           const SizedBox(height: 10),
 
-          // Quick-selection day buttons row
           Row(
             children: _daysList.map((day) {
               final isSelected = _selectedDays.contains(day);
@@ -621,7 +621,6 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
           ),
           const SizedBox(height: 16),
 
-          // 2. Select Time & Plus Button to log
           const Text(
             'SET TIME',
             style: TextStyle(
@@ -670,7 +669,6 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
                 ),
               ),
               const SizedBox(width: 10),
-              // Plus Button to log time
               Material(
                 color: AppColors.ink,
                 borderRadius: BorderRadius.circular(14),
@@ -693,7 +691,6 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
           ),
           const SizedBox(height: 16),
 
-          // 3. Field to add custom notification
           const Text(
             'CUSTOM NOTIFICATION MESSAGE',
             style: TextStyle(
@@ -730,6 +727,38 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
                 backgroundColor: AppColors.ink,
                 foregroundColor: AppColors.lime,
                 padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Test button to instantly check Android notification display
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                await NotificationService.showTestNotification();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Test notification dispatched! Check your status bar.',
+                    ),
+                    backgroundColor: AppColors.ink,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.notifications_active_outlined, size: 18),
+              label: const Text(
+                'Send Test Notification Now',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.ink,
+                side: const BorderSide(color: AppColors.line),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),

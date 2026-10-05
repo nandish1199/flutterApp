@@ -2,6 +2,8 @@
 
 class NotificationService {
   static Future<void> init() async {}
+  static Future<void> requestPermissions() async {}
+  static Future<void> showTestNotification() async {}
 
   static Future<void> scheduleWeeklyReminder({
     required int id,
@@ -13,6 +15,5 @@ class NotificationService {
   }) async {}
 
   static Future<void> cancel(int id) async {}
-
   static Future<void> cancelAll() async {}
 }
