@@ -10,37 +10,83 @@ import 'notification_service.dart';
 
 class WaterReminderItem {
   final int id;
-  final String day;
+  final List<String> days;
   final int hour;
   final int minute;
   final String customMessage;
 
   const WaterReminderItem({
     required this.id,
-    required this.day,
+    required this.days,
     required this.hour,
     required this.minute,
     required this.customMessage,
   });
 
+  /// Formatted string representing the selected days (e.g. "Every day" or "Mon, Wed, Fri")
+  String get day {
+    if (days.length >= 7 || days.contains('Every day')) return 'Every day';
+    const shortMap = {
+      'Monday': 'Mon',
+      'Tuesday': 'Tue',
+      'Wednesday': 'Wed',
+      'Thursday': 'Thu',
+      'Friday': 'Fri',
+      'Saturday': 'Sat',
+      'Sunday': 'Sun',
+    };
+    return days.map((d) => shortMap[d] ?? d).join(', ');
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
-    'day': day,
+    'days': days,
     'hour': hour,
     'minute': minute,
     'customMessage': customMessage,
   };
 
-  factory WaterReminderItem.fromJson(Map<String, dynamic> json) =>
-      WaterReminderItem(
-        id: json['id'] as int? ?? DateTime.now().millisecondsSinceEpoch % 10000,
-        day: json['day'] as String? ?? 'Every day',
-        hour: json['hour'] as int? ?? 8,
-        minute: json['minute'] as int? ?? 0,
-        customMessage:
-            json['customMessage'] as String? ??
-            'Time for a fresh glass of water! Stay hydrated. 💧',
-      );
+  factory WaterReminderItem.fromJson(Map<String, dynamic> json) {
+    List<String> parsedDays = [];
+    if (json['days'] is List) {
+      parsedDays = (json['days'] as List).map((e) => e.toString()).toList();
+    } else if (json['day'] is String) {
+      final oldDay = json['day'] as String;
+      if (oldDay == 'Every day') {
+        parsedDays = [
+          'Monday',
+          'Tuesday',
+          'Wednesday',
+          'Thursday',
+          'Friday',
+          'Saturday',
+          'Sunday',
+        ];
+      } else {
+        parsedDays = [oldDay];
+      }
+    }
+    if (parsedDays.isEmpty) {
+      parsedDays = [
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday',
+      ];
+    }
+    return WaterReminderItem(
+      id: json['id'] as int? ?? DateTime.now().millisecondsSinceEpoch % 10000,
+      days: parsedDays,
+      hour: json['hour'] as int? ?? 8,
+      minute: json['minute'] as int? ?? 0,
+      customMessage:
+          json['customMessage'] as String? ??
+          'Time for a fresh glass of water! Stay hydrated. 💧',
+    );
+  }
 }
 
 class WaterReminderStorage {
@@ -105,19 +151,20 @@ class WaterReminderStorage {
           ? reminder.customMessage.trim()
           : 'Time to drink a fresh glass of water!';
 
-      if (reminder.day == 'Every day') {
-        for (int w = 1; w <= 7; w++) {
-          await NotificationService.scheduleWeeklyReminder(
-            id: (reminder.id % 1000) * 10 + w,
-            title: title,
-            body: body,
-            weekday: w,
-            hour: reminder.hour,
-            minute: reminder.minute,
-          );
-        }
-      } else {
-        final weekday = weekdayToInt(reminder.day);
+      final targetDays = reminder.days.contains('Every day')
+          ? [
+              'Monday',
+              'Tuesday',
+              'Wednesday',
+              'Thursday',
+              'Friday',
+              'Saturday',
+              'Sunday',
+            ]
+          : reminder.days;
+
+      for (final dayName in targetDays) {
+        final weekday = weekdayToInt(dayName);
         if (weekday > 0) {
           await NotificationService.scheduleWeeklyReminder(
             id: (reminder.id % 1000) * 10 + weekday,
@@ -148,7 +195,6 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
   );
 
   static const List<String> _daysList = [
-    'Every day',
     'Monday',
     'Tuesday',
     'Wednesday',
@@ -158,7 +204,16 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
     'Sunday',
   ];
 
-  String _selectedDay = 'Every day';
+  final Set<String> _selectedDays = {
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  };
+
   TimeOfDay _selectedTime = const TimeOfDay(hour: 9, minute: 0);
 
   @override
@@ -204,11 +259,142 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
     }
   }
 
+  void _showDaySelectionDialog() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.paper,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final isAllSelected = _selectedDays.length == 7;
+            return SafeArea(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.75,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Select Days',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                if (isAllSelected) {
+                                  _selectedDays.clear();
+                                } else {
+                                  _selectedDays.addAll(_daysList);
+                                }
+                              });
+                              setSheetState(() {});
+                            },
+                            child: Text(
+                              isAllSelected ? 'Deselect All' : 'Select All',
+                              style: const TextStyle(
+                                color: AppColors.ink,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(color: AppColors.line),
+                      ..._daysList.map((day) {
+                        final isChecked = _selectedDays.contains(day);
+                        return CheckboxListTile(
+                          dense: true,
+                          activeColor: AppColors.ink,
+                          checkColor: AppColors.lime,
+                          title: Text(
+                            day,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                          value: isChecked,
+                          onChanged: (val) {
+                            setState(() {
+                              if (val == true) {
+                                _selectedDays.add(day);
+                              } else {
+                                _selectedDays.remove(day);
+                              }
+                            });
+                            setSheetState(() {});
+                          },
+                        );
+                      }),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.ink,
+                            foregroundColor: AppColors.lime,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text(
+                            'Done',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _addReminder() async {
+    if (_selectedDays.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'Please select at least one day.',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          ),
+        ),
+      );
+      return;
+    }
+
     final text = _customTextController.text.trim();
+    // Maintain Monday-Sunday chronological order
+    final sortedDays = _daysList
+        .where((d) => _selectedDays.contains(d))
+        .toList();
+
     final newReminder = WaterReminderItem(
       id: DateTime.now().millisecondsSinceEpoch % 10000,
-      day: _selectedDay,
+      days: sortedDays,
       hour: _selectedTime.hour,
       minute: _selectedTime.minute,
       customMessage: text.isNotEmpty
@@ -226,7 +412,7 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
         backgroundColor: AppColors.ink,
         behavior: SnackBarBehavior.floating,
         content: Text(
-          'Reminder logged for ${_formatTimeOfDay(_selectedTime)} (${_selectedDay})',
+          'Reminder logged for ${_formatTimeOfDay(_selectedTime)} (${newReminder.day})',
           style: const TextStyle(color: AppColors.lime),
         ),
       ),
@@ -244,6 +430,24 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
     final minute = time.minute.toString().padLeft(2, '0');
     final period = time.period == DayPeriod.am ? 'AM' : 'PM';
     return '$hour:$minute $period';
+  }
+
+  String get _selectedDaysSummary {
+    if (_selectedDays.length == 7) return 'Every day (7 days)';
+    if (_selectedDays.isEmpty) return 'No days selected';
+    const shortMap = {
+      'Monday': 'Mon',
+      'Tuesday': 'Tue',
+      'Wednesday': 'Wed',
+      'Thursday': 'Thu',
+      'Friday': 'Fri',
+      'Saturday': 'Sat',
+      'Sunday': 'Sun',
+    };
+    return _daysList
+        .where((d) => _selectedDays.contains(d))
+        .map((d) => shortMap[d] ?? d)
+        .join(', ');
   }
 
   @override
@@ -319,7 +523,7 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
                       ),
                     ),
                     Text(
-                      'Select day, set time, and customize message',
+                      'Select days, set time, and customize message',
                       style: TextStyle(fontSize: 12, color: AppColors.muted),
                     ),
                   ],
@@ -329,9 +533,9 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
           ),
           const SizedBox(height: 18),
 
-          // 1. Dropdown menu to select days in a week
+          // 1. Dropdown menu to select multiple days in a week
           const Text(
-            'SELECT DAY',
+            'SELECT DAYS',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w800,
@@ -340,16 +544,80 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
             ),
           ),
           const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: _selectedDay,
-            decoration: _inputDecoration(),
-            dropdownColor: AppColors.paper,
-            items: _daysList
-                .map((day) => DropdownMenuItem(value: day, child: Text(day)))
-                .toList(),
-            onChanged: (val) {
-              if (val != null) setState(() => _selectedDay = val);
-            },
+          InkWell(
+            onTap: _showDaySelectionDialog,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.line),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _selectedDaysSummary,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _selectedDays.isEmpty
+                            ? AppColors.soft
+                            : AppColors.ink,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: AppColors.muted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Quick-selection day buttons row
+          Row(
+            children: _daysList.map((day) {
+              final isSelected = _selectedDays.contains(day);
+              final label = day.substring(0, 3);
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (isSelected) {
+                        _selectedDays.remove(day);
+                      } else {
+                        _selectedDays.add(day);
+                      }
+                    });
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.ink : AppColors.background,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected ? AppColors.ink : AppColors.line,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: isSelected ? AppColors.lime : AppColors.muted,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
           const SizedBox(height: 16),
 
@@ -512,7 +780,7 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
               padding: EdgeInsets.symmetric(vertical: 20),
               child: Center(
                 child: Text(
-                  'No reminders logged yet.\nPick a time and tap "+" above to schedule.',
+                  'No reminders logged yet.\nPick days and a time, then tap "+" above.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
@@ -564,21 +832,25 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.background,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  item.day,
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.muted,
+                              Flexible(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.background,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    item.day,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.muted,
+                                    ),
                                   ),
                                 ),
                               ),
