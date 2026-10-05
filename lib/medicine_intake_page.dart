@@ -199,7 +199,9 @@ String medicineIntakeEntryKey(String doseId, DateTime date) =>
     '$doseId|${medicineDayKey(date)}';
 
 class MedicineIntakePage extends StatefulWidget {
-  const MedicineIntakePage({super.key});
+  const MedicineIntakePage({super.key, this.onNavigate});
+
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<MedicineIntakePage> createState() => _MedicineIntakePageState();
@@ -227,6 +229,7 @@ class _MedicineIntakePageState extends State<MedicineIntakePage> {
   int _period = 7;
   String _status = '';
   bool _statusIsError = false;
+  int _selectedFooterIndex = 0;
 
   @override
   void initState() {
@@ -479,6 +482,15 @@ class _MedicineIntakePageState extends State<MedicineIntakePage> {
       ? 'Daily'
       : '${medicine.days.length} day${medicine.days.length == 1 ? '' : 's'}';
 
+  void _onFooterDestinationSelected(int index) {
+    setState(() => _selectedFooterIndex = index);
+    if (widget.onNavigate != null) {
+      widget.onNavigate!(index);
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -503,20 +515,6 @@ class _MedicineIntakePageState extends State<MedicineIntakePage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
           children: [
-            if (Navigator.of(context).canPop()) ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back_rounded,
-                    color: AppColors.ink,
-                  ),
-                  onPressed: () => Navigator.of(context).pop(),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
             _header(),
             const SizedBox(height: 14),
             _safetyBanner(),
@@ -530,6 +528,40 @@ class _MedicineIntakePageState extends State<MedicineIntakePage> {
             _adherenceCard(),
           ],
         ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        selectedIndex: _selectedFooterIndex,
+        indicatorColor: AppColors.lime,
+        onDestinationSelected: _onFooterDestinationSelected,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.fitness_center_outlined),
+            selectedIcon: Icon(Icons.fitness_center),
+            label: 'Workout',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.ramen_dining),
+            selectedIcon: Icon(Icons.ramen_dining),
+            label: 'Calories',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.directions_run_outlined),
+            selectedIcon: Icon(Icons.directions_run),
+            label: 'Cardio',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
       ),
     );
   }

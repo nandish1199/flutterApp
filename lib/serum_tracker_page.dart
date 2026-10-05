@@ -306,20 +306,22 @@ class _SerumTrackerPageState extends State<SerumTrackerPage> {
         DateTime(periodStart.year, periodStart.month, periodStart.day),
       );
     }).length;
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-        children: [
-          _header(),
-          const SizedBox(height: 22),
-          _configureCard(),
-          const SizedBox(height: 22),
-          _configuredCard(),
-          const SizedBox(height: 22),
-          _checklistCard(today, appliedCount),
-          const SizedBox(height: 22),
-          _completionCard(periodApplications, today.length, appliedCount),
-        ],
+    return Scaffold(
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+          children: [
+            _header(),
+            const SizedBox(height: 22),
+            _configureCard(),
+            const SizedBox(height: 22),
+            _configuredCard(),
+            const SizedBox(height: 22),
+            _checklistCard(today, appliedCount),
+            const SizedBox(height: 22),
+            _completionCard(periodApplications, today.length, appliedCount),
+          ],
+        ),
       ),
     );
   }

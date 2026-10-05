@@ -452,18 +452,20 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-        children: [
-          _header(),
-          const SizedBox(height: 22),
-          _setupCard(),
-          const SizedBox(height: 22),
-          _practiceCard(),
-          const SizedBox(height: 22),
-          _calendarCard(),
-        ],
+    return Scaffold(
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+          children: [
+            _header(),
+            const SizedBox(height: 22),
+            _setupCard(),
+            const SizedBox(height: 22),
+            _practiceCard(),
+            const SizedBox(height: 22),
+            _calendarCard(),
+          ],
+        ),
       ),
     );
   }
