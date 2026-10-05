@@ -36,7 +36,7 @@ class ElateFitApp extends StatelessWidget {
 }
 
 /// Hosts the bottom navigation and switches between the
-/// Home, Workout, Progress, Serum, Breathing, Cardio, and Profile tabs.
+/// Home, Workout, Calories, Cardio, and Profile tabs.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -56,9 +56,15 @@ class _MainShellState extends State<MainShell> {
         activityRefreshToken: _index,
         onOpenWorkout: () => _openTab(1),
         onOpenProgress: () => _openTab(2),
-        onOpenSerum: () => _openTab(3),
-        onOpenBreathing: () => _openTab(4),
-        onOpenCardio: () => _openTab(5),
+        onOpenCardio: () => _openTab(3),
+        onOpenSerum: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const SerumTrackerPage()),
+        ),
+        onOpenBreathing: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const BreathingExercisePage(),
+          ),
+        ),
         onOpenWeight: () => Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => WeightTrackerPage(
@@ -82,9 +88,7 @@ class _MainShellState extends State<MainShell> {
         ),
       ),
       const WorkoutTrackerPage(),
-      CalorieTrackerPage(onOpenProfile: () => _openTab(6)),
-      const SerumTrackerPage(),
-      const BreathingExercisePage(),
+      CalorieTrackerPage(onOpenProfile: () => _openTab(4)),
       const CardioConfigurePage(),
       const ProfilePage(),
     ];
@@ -111,16 +115,6 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.ramen_dining),
             selectedIcon: Icon(Icons.ramen_dining),
             label: 'Calories',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.auto_awesome_outlined),
-            selectedIcon: Icon(Icons.auto_awesome),
-            label: 'Serum',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.air_outlined),
-            selectedIcon: Icon(Icons.air),
-            label: 'Breathe',
           ),
           NavigationDestination(
             icon: Icon(Icons.directions_run_outlined),
