@@ -472,6 +472,13 @@ class _BreathingExercisePageState extends State<BreathingExercisePage>
 
   Widget _header() => Row(
     children: [
+      IconButton(
+        onPressed: () => Navigator.pop(context),
+        icon: const Icon(Icons.arrow_back_rounded, color: AppColors.ink),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+      ),
+      const SizedBox(width: 14),
       Container(
         width: 46,
         height: 46,

@@ -71,9 +71,7 @@ class ProgressPhoto {
 }
 
 class WeightTrackerPage extends StatefulWidget {
-  const WeightTrackerPage({super.key, this.onNavigate});
-
-  final ValueChanged<int>? onNavigate;
+  const WeightTrackerPage({super.key});
 
   @override
   State<WeightTrackerPage> createState() => _WeightTrackerPageState();
@@ -264,54 +262,17 @@ class _WeightTrackerPageState extends State<WeightTrackerPage> {
         ],
       ),
     ),
-    bottomNavigationBar: NavigationBar(
-      backgroundColor: Colors.white,
-      elevation: 0,
-      selectedIndex: 0,
-      indicatorColor: AppColors.lime,
-      onDestinationSelected: widget.onNavigate,
-      destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.home_outlined),
-          selectedIcon: Icon(Icons.home),
-          label: 'Home',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.fitness_center_outlined),
-          selectedIcon: Icon(Icons.fitness_center),
-          label: 'Workout',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.ramen_dining),
-          selectedIcon: Icon(Icons.ramen_dining),
-          label: 'Calories',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.auto_awesome_outlined),
-          selectedIcon: Icon(Icons.auto_awesome),
-          label: 'Serum',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.air_outlined),
-          selectedIcon: Icon(Icons.air),
-          label: 'Breathe',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.bolt_outlined),
-          selectedIcon: Icon(Icons.bolt),
-          label: 'Cardio',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.person_outline),
-          selectedIcon: Icon(Icons.person),
-          label: 'Profile',
-        ),
-      ],
-    ),
   );
 
   Widget _intro() => Row(
     children: [
+      IconButton(
+        onPressed: () => Navigator.pop(context),
+        icon: const Icon(Icons.arrow_back_rounded, color: AppColors.ink),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+      ),
+      const SizedBox(width: 14),
       Container(
         width: 44,
         height: 44,

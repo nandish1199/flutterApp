@@ -369,27 +369,11 @@ class _SleepSoundsPageState extends State<SleepSoundsPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppColors.background,
-    appBar: AppBar(
-      backgroundColor: AppColors.background,
-      elevation: 0,
-      foregroundColor: AppColors.ink,
-      title: const Text(
-        'Sleep sounds',
-        style: TextStyle(fontWeight: FontWeight.w800),
-      ),
-      actions: [
-        IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.close_rounded),
-          tooltip: 'Close',
-        ),
-      ],
-    ),
     body: SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
         children: [
-          _intro(),
+          _header(),
           const SizedBox(height: 18),
           _libraryCard(),
           const SizedBox(height: 18),
@@ -399,38 +383,45 @@ class _SleepSoundsPageState extends State<SleepSoundsPage> {
     ),
   );
 
-  Widget _intro() => Row(
+  Widget _header() => Row(
     children: [
+      IconButton(
+        onPressed: () => Navigator.pop(context),
+        icon: const Icon(Icons.arrow_back_rounded, color: AppColors.ink),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+      ),
+      const SizedBox(width: 14),
       Container(
-        width: 44,
-        height: 44,
+        width: 46,
+        height: 46,
         decoration: BoxDecoration(
           color: AppColors.ink,
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: const Icon(
           Icons.nightlight_round,
           color: AppColors.lime,
-          size: 24,
+          size: 23,
         ),
       ),
-      const SizedBox(width: 11),
+      const SizedBox(width: 12),
       const Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Build your own calm',
+              'Sleep sounds',
               style: TextStyle(
                 color: AppColors.ink,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
               ),
             ),
             SizedBox(height: 3),
             Text(
               'Layer gentle sounds into a personal soundscape.',
-              style: TextStyle(color: AppColors.muted, fontSize: 12),
+              style: TextStyle(color: AppColors.muted, fontSize: 13),
             ),
           ],
         ),

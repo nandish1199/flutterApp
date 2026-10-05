@@ -199,9 +199,7 @@ String medicineIntakeEntryKey(String doseId, DateTime date) =>
     '$doseId|${medicineDayKey(date)}';
 
 class MedicineIntakePage extends StatefulWidget {
-  const MedicineIntakePage({super.key, this.onNavigate});
-
-  final ValueChanged<int>? onNavigate;
+  const MedicineIntakePage({super.key});
 
   @override
   State<MedicineIntakePage> createState() => _MedicineIntakePageState();
@@ -229,7 +227,6 @@ class _MedicineIntakePageState extends State<MedicineIntakePage> {
   int _period = 7;
   String _status = '';
   bool _statusIsError = false;
-  int _selectedFooterIndex = 0;
 
   @override
   void initState() {
@@ -482,15 +479,6 @@ class _MedicineIntakePageState extends State<MedicineIntakePage> {
       ? 'Daily'
       : '${medicine.days.length} day${medicine.days.length == 1 ? '' : 's'}';
 
-  void _onFooterDestinationSelected(int index) {
-    setState(() => _selectedFooterIndex = index);
-    if (widget.onNavigate != null) {
-      widget.onNavigate!(index);
-    } else if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -529,45 +517,18 @@ class _MedicineIntakePageState extends State<MedicineIntakePage> {
           ],
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        selectedIndex: _selectedFooterIndex,
-        indicatorColor: AppColors.lime,
-        onDestinationSelected: _onFooterDestinationSelected,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.fitness_center_outlined),
-            selectedIcon: Icon(Icons.fitness_center),
-            label: 'Workout',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.ramen_dining),
-            selectedIcon: Icon(Icons.ramen_dining),
-            label: 'Calories',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.directions_run_outlined),
-            selectedIcon: Icon(Icons.directions_run),
-            label: 'Cardio',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-      ),
     );
   }
 
   Widget _header() => Row(
     children: [
+      IconButton(
+        onPressed: () => Navigator.pop(context),
+        icon: const Icon(Icons.arrow_back_rounded, color: AppColors.ink),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+      ),
+      const SizedBox(width: 14),
       Container(
         width: 46,
         height: 46,

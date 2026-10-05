@@ -551,24 +551,36 @@ class _CardioConfigurePageState extends State<CardioConfigurePage> {
       '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    child: ListView(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-      children: [
-        _header(),
-        const SizedBox(height: 22),
-        _formCard(),
-        const SizedBox(height: 22),
-        _orderCard(),
-        if (_timerState != null) ...[const SizedBox(height: 22), _timerCard()],
-        const SizedBox(height: 22),
-        _calendarCard(),
-      ],
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+        children: [
+          _header(),
+          const SizedBox(height: 22),
+          _formCard(),
+          const SizedBox(height: 22),
+          _orderCard(),
+          if (_timerState != null) ...[
+            const SizedBox(height: 22),
+            _timerCard(),
+          ],
+          const SizedBox(height: 22),
+          _calendarCard(),
+        ],
+      ),
     ),
   );
 
   Widget _header() => Row(
     children: [
+      IconButton(
+        onPressed: () => Navigator.pop(context),
+        icon: const Icon(Icons.arrow_back_rounded, color: AppColors.ink),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+      ),
+      const SizedBox(width: 14),
       Container(
         width: 46,
         height: 46,

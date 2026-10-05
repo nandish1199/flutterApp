@@ -306,7 +306,9 @@ class _SerumTrackerPageState extends State<SerumTrackerPage> {
         DateTime(periodStart.year, periodStart.month, periodStart.day),
       );
     }).length;
+
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
@@ -328,6 +330,13 @@ class _SerumTrackerPageState extends State<SerumTrackerPage> {
 
   Widget _header() => Row(
     children: [
+      IconButton(
+        onPressed: () => Navigator.pop(context),
+        icon: const Icon(Icons.arrow_back_rounded, color: AppColors.ink),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+      ),
+      const SizedBox(width: 14),
       Container(
         width: 46,
         height: 46,

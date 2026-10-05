@@ -66,14 +66,7 @@ class _MainShellState extends State<MainShell> {
           ),
         ),
         onOpenWeight: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => WeightTrackerPage(
-              onNavigate: (index) {
-                Navigator.of(context).pop();
-                _openTab(index);
-              },
-            ),
-          ),
+          MaterialPageRoute<void>(builder: (_) => const WeightTrackerPage()),
         ),
         onOpenSleepSounds: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const SleepSoundsPage()),
