@@ -287,7 +287,7 @@ class HomePage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Good morning, Nandish',
+              'Elatefit',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
