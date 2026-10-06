@@ -2,27 +2,21 @@
 
 ## Web push reminders
 
-Water reminder notifications are sent as Firebase Cloud Messaging web push messages.
-Local notifications are not used; scheduled reminders are available in the web app.
+### In cPannel, under home2/elatec40/public_html/api/ there are 4 files:
 
-Before running or deploying:
+- save_reminder.php: (NEEDED to save the reminder)
+- test_cron.php: to test the cron_dispatcher php file. (Functionally not needed, its just for testing purpose)
+- test_push.php: (Functionally not needed, its just for testing purpose)
+- test_run_cron.php: to test the cron_dispatcher php file. (Functionally not needed, its just for testing purpose)
 
-1. In Firebase project `elatefit-49091`, enable Anonymous Authentication and create
-   a Firestore database.
-2. Confirm the Firebase Web Push certificate uses the public VAPID key configured
-   in `lib/firebase-notification.dart`.
-3. Serve the web app over HTTPS (localhost is also supported for development) so
-   the browser can register `web/firebase-messaging-sw.js`.
-4. Install the Firebase CLI and Node.js 20 or newer, install the functions
-   dependencies with `npm --prefix functions install`, then run
-   `firebase deploy --only firestore:rules,functions` from the repository root.
-   The scheduled Cloud Function runs every minute; deploying it requires the
-   Firebase Blaze plan with Cloud Scheduler enabled. The scheduler checks all
-   active water-reminder documents each minute, so Firestore reads grow with the
-   number of saved reminders.
-5. Build and host the Flutter web app with `flutter build web`. The Firebase
-   service worker must be hosted at the site root.
+**Important**: The above test files contain database information that are not added now, whenever required add the following information and use it:
+$cpanel_user = 'elatec40'; // <-- Replace with your cPanel username
+$db_user = 'elatec40_dbuser'; // <-- Replace with your DB user
+$db_pass     = 'N@ndish5787'; // <-- Replace with your DB password
+$db_name = 'elatec40_water_reminders'; // <-- Replace with your DB name
 
-Users enable browser notification permission from the Water Intake Reminder
-screen. Their schedules and FCM token are stored in their anonymous-authenticated
-Firestore user document; Firestore rules prevent access across users.
+### In cPannel, under home2/elatec40/php/ there are 3 files:
+
+- cron_dispatcher.php: Used to trigger dispatcher in every minuit to send notification.
+- save_reminder.php
+- service-account.json: contains your all details like api keys and all.
