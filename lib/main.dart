@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,12 +17,12 @@ import 'sleep_sounds_page.dart';
 import 'stretching_configure_page.dart';
 import 'workout_tracker_page.dart';
 import 'weight_tracker_page.dart';
-import 'notification_service.dart';
+import 'firebase_notification_service.dart';
 import 'water_intake_reminder_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService.init();
+  await FirebaseNotificationService.initialize();
   runApp(const ElateFitApp());
 }
 
@@ -187,9 +188,18 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _toggleWaterReminder(bool value) async {
-    await WaterReminderStorage.setEnabled(value);
-    setState(() => _waterReminderEnabled = value);
-    await WaterReminderStorage.syncNotifications();
+    try {
+      await WaterReminderStorage.setEnabled(value);
+      if (mounted) setState(() => _waterReminderEnabled = value);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not sync reminder settings: $error'),
+          backgroundColor: HomePage.ink,
+        ),
+      );
+    }
   }
 
   void _openWaterReminderPage() {
@@ -762,7 +772,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                     SizedBox(height: 3),
                     Text(
-                      'Stay hydrated throughout the day',
+                      'Scheduled browser push notifications',
                       style: TextStyle(color: Color(0xFF87938C), fontSize: 11),
                     ),
                   ],

@@ -1,0 +1,87 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function ownsUser(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read: if ownsUser(userId);
+      allow create, update: if ownsUser(userId)
+        && request.resource.data.keys().hasOnly([
+          'pushToken',
+          'notificationsEnabled',
+          'timeZone'
+        ])
+        && request.resource.data.notificationsEnabled is bool
+        && request.resource.data.timeZone is string
+        && request.resource.data.timeZone.size() > 0
+        && request.resource.data.timeZone.size() <= 100
+        && (
+          !('pushToken' in request.resource.data)
+          || (
+            request.resource.data.pushToken is string
+            && request.resource.data.pushToken.size() > 0
+            && request.resource.data.pushToken.size() <= 4096
+          )
+        );
+      allow delete: if false;
+
+      match /waterReminders/{reminderId} {
+        function validReminder(data) {
+          return data.keys().hasOnly([
+              'days',
+              'hour',
+              'minute',
+              'message',
+              'enabled',
+              'lastSentDate',
+              'lastSentAt'
+            ])
+            && data.days is list
+            && data.days.size() > 0
+            && data.days.size() <= 7
+            && data.days.hasOnly([
+              'Monday',
+              'Tuesday',
+              'Wednesday',
+              'Thursday',
+              'Friday',
+              'Saturday',
+              'Sunday'
+            ])
+            && data.hour is int
+            && data.hour >= 0
+            && data.hour <= 23
+            && data.minute is int
+            && data.minute >= 0
+            && data.minute <= 59
+            && data.message is string
+            && data.message.size() <= 500
+            && data.enabled is bool;
+        }
+
+        allow read, delete: if ownsUser(userId);
+        allow create: if ownsUser(userId)
+          && request.resource.data.keys().hasOnly([
+            'days',
+            'hour',
+            'minute',
+            'message',
+            'enabled'
+          ])
+          && validReminder(request.resource.data);
+        allow update: if ownsUser(userId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'days',
+            'hour',
+            'minute',
+            'message',
+            'enabled'
+          ])
+          && validReminder(request.resource.data);
+      }
+    }
+  }
+}

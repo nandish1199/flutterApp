@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "120148446375",
+    "project_id": "elatefit-49091",
+    "storage_bucket": "elatefit-49091.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:120148446375:android:3b0c685bfb937fc41adf82",
+        "android_client_info": {
+          "package_name": "com.example.flutter_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAoqgbZerRT1hN-qiXUo13bF97uyVUmQb4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

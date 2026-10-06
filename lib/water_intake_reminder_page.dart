@@ -2,11 +2,12 @@
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_colors.dart';
-import 'notification_service.dart';
+import 'firebase_notification_service.dart';
 
 class WaterReminderItem {
   final int id;
@@ -92,18 +93,26 @@ class WaterReminderStorage {
   static const String kRemindersKey = 'elateFitWaterReminders';
   static const String kEnabledKey = 'elateFitWaterReminderEnabled';
 
-  static Future<List<WaterReminderItem>> loadReminders() async {
+  static Future<List<WaterReminderItem>> _loadLocalReminders() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(kRemindersKey);
-    if (raw == null) return [];
-    try {
-      final decoded = jsonDecode(raw) as List;
-      return decoded
-          .map((e) => WaterReminderItem.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      return [];
+    var localReminders = <WaterReminderItem>[];
+    if (raw != null) {
+      try {
+        final decoded = jsonDecode(raw) as List;
+        localReminders = decoded
+            .map((e) => WaterReminderItem.fromJson(e as Map<String, dynamic>))
+            .toList();
+      } catch (_) {
+        localReminders = [];
+      }
     }
+    return localReminders;
+  }
+
+  static Future<List<WaterReminderItem>> loadReminders() async {
+    final localReminders = await _loadLocalReminders();
+    return localReminders;
   }
 
   static Future<void> saveReminders(List<WaterReminderItem> items) async {
@@ -122,59 +131,17 @@ class WaterReminderStorage {
   static Future<void> setEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(kEnabledKey, enabled);
+    await FirebaseNotificationService.setEnabled(enabled);
   }
 
-  static int weekdayToInt(String day) => switch (day) {
-    'Monday' => 1,
-    'Tuesday' => 2,
-    'Wednesday' => 3,
-    'Thursday' => 4,
-    'Friday' => 5,
-    'Saturday' => 6,
-    'Sunday' => 7,
-    _ => 0,
-  };
-
-  static Future<void> syncNotifications() async {
-    final enabled = await isEnabled();
-    final reminders = await loadReminders();
-
-    await NotificationService.cancelAll();
-
-    if (!enabled) return;
-
-    for (final reminder in reminders) {
-      final title = '💧 Water Intake Reminder';
-      final body = reminder.customMessage.trim().isNotEmpty
-          ? reminder.customMessage.trim()
-          : 'Time to drink a fresh glass of water!';
-
-      final targetDays = reminder.days.contains('Every day')
-          ? [
-              'Monday',
-              'Tuesday',
-              'Wednesday',
-              'Thursday',
-              'Friday',
-              'Saturday',
-              'Sunday',
-            ]
-          : reminder.days;
-
-      for (final dayName in targetDays) {
-        final weekday = weekdayToInt(dayName);
-        if (weekday > 0) {
-          await NotificationService.scheduleWeeklyReminder(
-            id: (reminder.id % 1000) * 10 + weekday,
-            title: title,
-            body: body,
-            weekday: weekday,
-            hour: reminder.hour,
-            minute: reminder.minute,
-          );
-        }
-      }
-    }
+  static Future<void> syncRemoteReminders() async {
+    // Removed "if (!kIsWeb) return;" so Android syncs too
+    await FirebaseNotificationService.syncWaterReminders(
+      reminders: (await _loadLocalReminders())
+          .map((reminder) => reminder.toJson())
+          .toList(),
+      enabled: await isEnabled(),
+    );
   }
 }
 
@@ -191,6 +158,7 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
   final TextEditingController _customTextController = TextEditingController(
     text: 'Time for a fresh glass of water! Stay hydrated. 💧',
   );
+  String? _syncError;
 
   static const List<String> _daysList = [
     'Monday',
@@ -217,12 +185,7 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
   @override
   void initState() {
     super.initState();
-    _initPermissionsAndLoad();
-  }
-
-  Future<void> _initPermissionsAndLoad() async {
-    await NotificationService.requestPermissions();
-    await _loadData();
+    _loadData();
   }
 
   @override
@@ -232,11 +195,20 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
   }
 
   Future<void> _loadData() async {
-    final loaded = await WaterReminderStorage.loadReminders();
-    setState(() {
-      _reminders.clear();
-      _reminders.addAll(loaded);
-    });
+    try {
+      final loaded = await WaterReminderStorage.loadReminders();
+      if (!mounted) return;
+      setState(() {
+        _reminders
+          ..clear()
+          ..addAll(loaded);
+        _syncError = null;
+      });
+      await WaterReminderStorage.syncRemoteReminders();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _syncError = 'Could not sync reminders: $error');
+    }
   }
 
   Future<void> _pickTime() async {
@@ -395,7 +367,7 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
         .toList();
 
     final newReminder = WaterReminderItem(
-      id: DateTime.now().millisecondsSinceEpoch % 10000,
+      id: DateTime.now().millisecondsSinceEpoch,
       days: sortedDays,
       hour: _selectedTime.hour,
       minute: _selectedTime.minute,
@@ -406,7 +378,18 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
 
     setState(() => _reminders.add(newReminder));
     await WaterReminderStorage.saveReminders(_reminders);
-    await WaterReminderStorage.syncNotifications();
+    try {
+      await WaterReminderStorage.syncRemoteReminders();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Reminder saved, but cloud sync failed: $error'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -424,7 +407,52 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
   Future<void> _deleteReminder(int index) async {
     setState(() => _reminders.removeAt(index));
     await WaterReminderStorage.saveReminders(_reminders);
-    await WaterReminderStorage.syncNotifications();
+    try {
+      await WaterReminderStorage.syncRemoteReminders();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Reminder removed locally, but cloud sync failed: $error',
+          ),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
+  }
+
+  Future<void> _enableWebPush() async {
+    try {
+      final token =
+          await FirebaseNotificationService.requestPermissionAndRegister();
+      if (!mounted) return;
+      if (token == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Browser notification permission was not granted.'),
+            backgroundColor: AppColors.ink,
+          ),
+        );
+        return;
+      }
+      await WaterReminderStorage.syncRemoteReminders();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Web push notifications are enabled.'),
+          backgroundColor: AppColors.ink,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not enable web push: $error'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
   }
 
   String _formatTimeOfDay(TimeOfDay time) {
@@ -476,6 +504,15 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
           children: [
+            if (_syncError case final error?) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  error,
+                  style: const TextStyle(color: AppColors.danger),
+                ),
+              ),
+            ],
             _setupCard(),
             const SizedBox(height: 22),
             _remindersList(),
@@ -703,6 +740,7 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
           const SizedBox(height: 8),
           TextField(
             controller: _customTextController,
+            maxLength: 500,
             maxLines: 2,
             style: const TextStyle(
               fontSize: 13,
@@ -734,25 +772,13 @@ class _WaterIntakeReminderPageState extends State<WaterIntakeReminderPage> {
             ),
           ),
           const SizedBox(height: 8),
-          // Test button to instantly check Android notification display
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () async {
-                await NotificationService.showTestNotification();
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Test notification dispatched! Check your status bar.',
-                    ),
-                    backgroundColor: AppColors.ink,
-                  ),
-                );
-              },
+              onPressed: _enableWebPush,
               icon: const Icon(Icons.notifications_active_outlined, size: 18),
               label: const Text(
-                'Send Test Notification Now',
+                'Enable Web Push Notifications',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               style: OutlinedButton.styleFrom(
